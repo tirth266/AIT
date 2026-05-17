@@ -1,0 +1,15 @@
+{
+  "name": "trading-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Indian Stock Market Trading Platform",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "preview": "cd frontend && npm run preview",
+    "lint": "cd frontend && npm run lint"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

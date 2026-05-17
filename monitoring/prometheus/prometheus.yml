@@ -1,0 +1,186 @@
+# =============================================================================
+# Prometheus Configuration
+# =============================================================================
+# Complete monitoring configuration for trading platform
+# Supports: Metrics, Alerting, Recording Rules
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'trading-platform'
+    environment: '${ENVIRONMENT:-production}'
+  scrape_timeout: 10s
+
+# Alerting configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+          scheme: http
+          timeout: 10s
+          api_version: v2
+
+# Rule files for alerts and recording rules
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+  - '/etc/prometheus/alerting/*.yml'
+
+# Scrape configurations
+scrape_configs:
+  # =============================================================================
+  # PROMETHEUS SELF-MONITORING
+  # =============================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # =============================================================================
+  # FLASK APPLICATION METRICS
+  # =============================================================================
+  - job_name: 'trading-backend'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:5000']
+        labels:
+          service: 'trading-backend'
+          component: 'api'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        regex: '([^:]+):\\d+'
+        replacement: '${1}'
+      - action: labelmap
+        regex: '__meta_.*'
+
+  # =============================================================================
+  # WEBSOCKET METRICS
+  # =============================================================================
+  - job_name: 'trading-websocket'
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    static_configs:
+      - targets: ['backend:5000']
+        labels:
+          service: 'trading-websocket'
+          component: 'socketio'
+
+  # =============================================================================
+  # NODE EXPORTER - SYSTEM METRICS
+  # =============================================================================
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+
+  # =============================================================================
+  # NODE EXPORTER - CELERY WORKER
+  # =============================================================================
+  - job_name: 'celery-worker'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'celery-worker'
+
+  # =============================================================================
+  # MONGODB EXPORTER
+  # =============================================================================
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+        labels:
+          service: 'mongodb'
+          database: 'trading_db'
+
+  # =============================================================================
+  # REDIS EXPORTER
+  # =============================================================================
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+        labels:
+          service: 'redis'
+          database: 'trading_cache'
+
+  # =============================================================================
+  # CADVISOR - CONTAINER METRICS
+  # =============================================================================
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+        labels:
+          service: 'cadvisor'
+
+  # =============================================================================
+  # BLACKBOX PROBES - UPTIME MONITORING
+  # =============================================================================
+  - job_name: 'blackbox-http'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+          - 'http://backend:5000/api/v1/health'
+          - 'http://nginx:80/health'
+          - 'http://nginx:80/api/v1/health'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: 'blackbox-exporter:9115'
+
+  # =============================================================================
+  # GRAFANA METRICS
+  # =============================================================================
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+
+  # =============================================================================
+  # NGINX METRICS
+  # =============================================================================
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+        labels:
+          service: 'nginx'
+
+# =============================================================================
+# STORAGE CONFIGURATION
+# =============================================================================
+storage:
+  tsdb:
+    path: /prometheus
+    retention.time: 30d
+    retention.size: 50GB
+    min-block-duration: 2h
+    max-block-duration: 2h
+
+# =============================================================================
+# REMOTE WRITE (for long-term storage)
+# =============================================================================
+# remote_write:
+#   - url: http://thanos-receive:19291/api/v1/receive
+#     queue_config:
+#       capacity: 10000
+#       max_shards: 30
+#       min_shards: 5
+#       max_samples_per_send: 500
+#       batch_send_deadline: 5s
+
+# =============================================================================
+# REMOTE READ (for query federation)
+# # =============================================================================
+# remote_read:
+#   - url: http://thanos-store:10902/api/v1/read
+#     read_recent: true

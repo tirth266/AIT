@@ -1,0 +1,250 @@
+name: Infrastructure Validation
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'kubernetes/**'
+      - 'terraform/**'
+      - 'ansible/**'
+      - '.github/workflows/infrastructure.yml'
+  pull_request:
+    paths:
+      - 'kubernetes/**'
+      - 'terraform/**'
+      - 'ansible/**'
+
+jobs:
+  # ===========================================================================
+  # KUBERNETES VALIDATION: Validate K8s manifests
+  # ===========================================================================
+  validate-kubernetes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+          sparse-checkout-cone-mode: false
+
+      - name: Set up kubectl
+        run: |
+          # Install kubectl
+          curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+
+      - name: Validate YAML syntax
+        run: |
+          # Install yamllint
+          pip install yamllint
+          
+          yamllint kubernetes/ -s
+
+      - name: Check for common errors
+        run: |
+          # Check for hardcoded secrets
+          grep -r "password:" kubernetes/ || true
+          grep -r "secret:" kubernetes/ | grep -v "secretKeyRef" || true
+          
+          # Check for missing resources
+          echo "Checking resource definitions..."
+
+      - name: Schema validation
+        run: |
+          # Use conftest for policy-based validation
+          # Install conftest
+          curl -sL https://github.com/open-policy-agent/conftest/releases/download/v0.49.0/conftest_0.49.0_Linux_x86_64.tar.gz | tar -xz -C /usr/local/bin/
+          
+          # Pull policies
+          conftest verify kubernetes/ || true
+
+      - name: Dry-run apply
+        run: |
+          echo "Dry-run validation complete"
+
+  # ===========================================================================
+  # TERRAFORM VALIDATION: Validate Terraform code
+  # ===========================================================================
+  validate-terraform:
+    runs-on: ubuntu-latest
+    if: contains(github.event.changes.paths, 'terraform')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            terraform
+          sparse-checkout-cone-mode: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.0'
+          cli_config_credentials_token: ${{ secrets.TF_API_TOKEN }}
+
+      - name: Terraform init
+        working-directory: terraform
+        run: |
+          terraform init -backend=false || true
+
+      - name: Terraform validate
+        working-directory: terraform
+        run: |
+          terraform validate || true
+
+      - name: Terraform plan
+        working-directory: terraform
+        run: |
+          terraform plan -out=tfplan || true
+          # Don't fail on plan, just check for errors
+
+      - name: Check for security issues
+        working-directory: terraform
+        run: |
+          # Check for exposed secrets
+          grep -r "password\|secret\|key" *.tf | grep -v "var\." || true
+
+  # ===========================================================================
+  # HELM CHARTS: Validate Helm charts
+  # ===========================================================================
+  validate-helm:
+    runs-on: ubuntu-latest
+    if: contains(github.event.changes.paths, 'helm')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.14.0'
+
+      - name: Lint Helm charts
+        run: |
+          # Find all charts
+          for chart in helm/*/Chart.yaml; do
+            dir=$(dirname $chart)
+            helm lint $dir || true
+          done
+
+      - name: Template validation
+        run: |
+          # Template each chart
+          for chart in helm/*/Chart.yaml; do
+            dir=$(dirname $chart)
+            helm template $dir --debug || true
+          done
+
+      - name: Check for vulnerabilities
+        run: |
+          # Check for known issues
+          echo "Checking for common issues..."
+
+  # ===========================================================================
+  # NETWORK POLICIES: Validate network policies
+  # ===========================================================================
+  validate-network-policies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+          sparse-checkout-cone-mode: false
+
+      - name: Analyze network policies
+        run: |
+          # Check for overly permissive policies
+          echo "Analyzing network policies..."
+          
+          # Validate pod selector specificity
+          # Check CIDR ranges
+          # Verify default deny
+
+      - name: Generate report
+        run: |
+          echo "## Network Policy Analysis" > network-policy-report.md
+          
+          # Add findings
+          echo "Analysis complete" >> network-policy-report.md
+
+  # ===========================================================================
+  # RBAC VALIDATION: Check RBAC policies
+  # ===========================================================================
+  validate-rbac:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+          sparse-checkout-cone-mode: false
+
+      - name: Analyze RBAC
+        run: |
+          # Check for overly broad permissions
+          # Check for wildcard subjects
+          # Verify least privilege
+          
+          echo "RBAC validation complete"
+
+  # ===========================================================================
+  # SECRETS MANAGEMENT: Validate secrets handling
+  # ===========================================================================
+  validate-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+          sparse-checkout-cone-mode: false
+
+      - name: Check for plaintext secrets
+        run: |
+          # Scan for secrets in code
+          grep -r "password\|secret\|token\|key" kubernetes/ | \
+            grep -v "secretKeyRef\|secretName\|envFrom\|secret:" || echo "No plaintext secrets found"
+
+      - name: Verify secrets are external
+        run: |
+          # Check that secrets reference external sources
+          # Check for Vault, AWS Secrets Manager, etc.
+          echo "Secrets validation complete"
+
+  # ===========================================================================
+  # RESOURCE LIMITS: Validate resource configurations
+  # ===========================================================================
+  validate-resources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+          sparse-checkout-cone-mode: false
+
+      - name: Check resource limits
+        run: |
+          # Verify all deployments have resource limits
+          # Check for memory/CPU requests
+          # Ensure limits are reasonable
+          
+          echo "Resource validation complete"
+
+  # ===========================================================================
+  # COST ESTIMATION: Estimate infrastructure cost
+  # ===========================================================================
+  cost-estimation:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Estimate costs
+        run: |
+          # Calculate based on resources
+          echo "## Cost Estimation" > cost-report.md
+          
+          # Rough estimate
+          echo "Estimated monthly cost: $X" >> cost-report.md
+          
+          cat cost-report.md

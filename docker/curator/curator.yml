@@ -1,0 +1,14 @@
+client:
+  hosts:
+    - elasticsearch:9200
+  http_auth: elastic:changeme_in_production
+  use_ssl: true
+  verify_certs: false
+  timeout: 30
+  master_only: false
+
+logging:
+  loglevel: INFO
+  logfile: /var/log/curator/curator.log
+  logformat: default
+  blacklist: ['elasticsearch', 'urllib3']

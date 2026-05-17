@@ -1,0 +1,292 @@
+# =============================================================================
+# MONITORING STACK DOCKER COMPOSE
+# =============================================================================
+# Complete observability stack: Prometheus, Grafana, Loki, Tempo, Alertmanager
+#
+# Usage:
+#   docker-compose -f docker-compose.monitoring.yml up -d
+#   docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up -d
+# =============================================================================
+
+services:
+  # =============================================================================
+  # PROMETHEUS - Metrics Collection
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: monitoring-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=50GB'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/prometheus/rules:/etc/prometheus/rules:ro
+      - ./monitoring/prometheus/alerting:/etc/prometheus/alerting:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # GRAFANA - Dashboards & Visualization
+  # =============================================================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: monitoring-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_LOG_LEVEL=info
+      - GF_DATE_FORMATS_USE_USERSETTING=true
+      - GF_EXPLORE_ENABLED=true
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_RENDERING_ENABLED=true
+      - GF_RENDERING_TIMEOUT=30s
+      - GF_RENDERING_CONCURRENCY=4
+      - GF_FEATURE_TOGGLES_ENABLE=traceToMetrics
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # LOKI - Log Aggregation
+  # =============================================================================
+  loki:
+    image: grafana/loki:2.9.2
+    container_name: monitoring-loki
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/loki/local-config.yaml
+      - -common.target=all
+      - -common.storage.type=filesystem
+    volumes:
+      - loki_data:/loki
+    ports:
+      - "3100:3100"
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # TEMPO - Distributed Tracing
+  # =============================================================================
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: monitoring-tempo
+    restart: unless-stopped
+    command:
+      - -config.file=/etc/tempo.yaml
+      - -mem-ballast-size-mb=1024
+      - -target=all
+    volumes:
+      - tempo_data:/var/tempo
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9411:9411"
+    networks:
+      - monitoring-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # ALERTMANAGER - Alert Routing
+  # =============================================================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: monitoring-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.listen-address=:9093'
+    volumes:
+      - ./monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "9093:9093"
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # NODE EXPORTER - System Metrics
+  # =============================================================================
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: monitoring-node-exporter
+    restart: unless-stopped
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/host'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host:ro
+    ports:
+      - "9100:9100"
+    networks:
+      - monitoring-network
+
+  # =============================================================================
+  # CADVISOR - Container Metrics
+  # =============================================================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: monitoring-cadvisor
+    restart: unless-stopped
+    command:
+      - --housekeeping_interval=30s
+      - --docker_only=true
+      - --docker_env_filter_as_env=
+      - --storage_duration=2m0s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/rootfs:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - monitoring-network
+
+  # =============================================================================
+  # MONGODB EXPORTER - Database Metrics
+  # =============================================================================
+  mongodb-exporter:
+    image: percona/mongodb_exporter:0.40.0
+    container_name: monitoring-mongodb-exporter
+    restart: unless-stopped
+    environment:
+      - MONGODB_URI=mongodb://${MONGO_USER:-trading_admin}:${MONGO_PASSWORD:-change_me_in_production}@mongodb:27017/?authSource=admin&directConnection=true
+      - MONGODB_METRICS_PATH=database
+      - MONGODB_COLLECTORS=dbstats,replset,top
+    ports:
+      - "9216:9216"
+    networks:
+      - monitoring-network
+    depends_on:
+      - mongodb
+
+  # =============================================================================
+  # REDIS EXPORTER - Cache Metrics
+  # =============================================================================
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.55.0
+    container_name: monitoring-redis-exporter
+    restart: unless-stopped
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    ports:
+      - "9121:9121"
+    networks:
+      - monitoring-network
+    depends_on:
+      - redis
+
+  # =============================================================================
+  # BLACKBOX EXPORTER - HTTP/S Probe Monitoring
+  # =============================================================================
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: monitoring-blackbox-exporter
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/blackbox/blackbox.yml'
+      - '--web.listen-address=:9115'
+    volumes:
+      - ./monitoring/blackbox/blackbox.yml:/etc/blackbox/blackbox.yml:ro
+    ports:
+      - "9115:9115"
+    networks:
+      - monitoring-network
+
+  # =============================================================================
+  # NGINX EXPORTER - Reverse Proxy Metrics
+  # =============================================================================
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.1.0
+    container_name: monitoring-nginx-exporter
+    restart: unless-stopped
+    command:
+      - -nginx.scrape-uri=http://nginx:80/metrics
+    ports:
+      - "9113:9113"
+    networks:
+      - monitoring-network
+    depends_on:
+      - nginx
+
+  # =============================================================================
+  # PUSHGATEWAY - Metrics Buffering
+  # =============================================================================
+  pushgateway:
+    image: prom/pushgateway:v1.6.0
+    container_name: monitoring-pushgateway
+    restart: unless-stopped
+    ports:
+      - "9091:9091"
+    networks:
+      - monitoring-network
+
+networks:
+  monitoring-network:
+    driver: bridge
+    name: monitoring-network
+
+volumes:
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  tempo_data:
+    driver: local
+  alertmanager_data:
+    driver: local

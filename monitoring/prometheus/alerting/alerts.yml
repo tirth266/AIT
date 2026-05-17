@@ -1,0 +1,268 @@
+# =============================================================================
+# Alert Rules - Trading Platform Critical Alerts
+# =============================================================================
+# Groups define alert conditions and notification channels
+# =============================================================================
+
+groups:
+  # =============================================================================
+  # CRITICAL ALERTS - Immediate notification required
+  # =============================================================================
+  - name: critical
+    interval: 30s
+    rules:
+      # Service Down - Critical
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "{{ $labels.service }} on {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://wiki.example.com/runbooks/service-down"
+
+      # High Error Rate - Critical
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{service="trading-backend",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{service="trading-backend"}[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          team: trading
+        annotations:
+          summary: "High error rate on trading backend"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+
+      # Order Execution Failures - Critical
+      - alert: OrderExecutionFailures
+        expr: |
+          (
+            sum(rate(trading_orders_failed_total[5m]))
+            /
+            sum(rate(trading_orders_total[5m]))
+          ) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          team: trading
+        annotations:
+          summary: "High order failure rate"
+          description: "{{ $value | humanizePercentage }} of orders failed in the last 5 minutes"
+
+      # Strategy Failures - Critical
+      - alert: StrategyFailures
+        expr: |
+          (
+            sum(rate(trading_strategy_failures_total[5m]))
+            /
+            sum(rate(trading_strategy_executions_total[5m]))
+          ) > 0.15
+        for: 2m
+        labels:
+          severity: critical
+          team: trading
+        annotations:
+          summary: "Strategy execution failure spike"
+          description: "{{ $value | humanizePercentage }} of strategy executions failed"
+
+      # Memory Exhaustion - Critical
+      - alert: MemoryExhaustion
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Memory usage critical on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 95%)"
+
+      # Database Connection Failure - Critical
+      - alert: DatabaseConnectionFailure
+        expr: |
+          mongodb_mongod_connections{state="active"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "No active MongoDB connections"
+          description: "MongoDB connection pool is depleted"
+
+      # Redis Connection Failure - Critical
+      - alert: RedisConnectionFailure
+        expr: |
+          redis_connected_clients == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "Redis connection lost"
+          description: "No active Redis connections detected"
+
+  # =============================================================================
+  # WARNING ALERTS - Requires attention within 5 minutes
+  # =============================================================================
+  - name: warnings
+    interval: 30s
+    rules:
+      # High API Latency
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{service="trading-backend"}[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s (threshold: 2s)"
+
+      # High WebSocket Latency
+      - alert: HighWebSocketLatency
+        expr: |
+          histogram_quantile(0.95, rate(websocket_message_latency_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High WebSocket latency"
+          description: "95th percentile WebSocket message latency is {{ $value }}s"
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% (threshold: 80%)"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} (threshold: 85%)"
+
+      # MongoDB Slow Queries
+      - alert: MongoDBSlowQueries
+        expr: |
+          histogram_quantile(0.95, rate(mongodb_mongod_operation_duration_seconds_bucket{type="query"}[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "MongoDB slow queries detected"
+          description: "95th percentile query time is {{ $value }}s"
+
+      # Redis Memory Warning
+      - alert: RedisMemoryWarning
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis memory is {{ $value | humanizePercentage }} of max"
+
+      # Disk Space Warning
+      - alert: DiskSpaceWarning
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk space is {{ $value | humanizePercentage }} available"
+
+      # WebSocket Connection Limit Warning
+      - alert: WebSocketConnectionsHigh
+        expr: |
+          websocket_active_connections > 800
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "High WebSocket connections"
+          description: "Active connections: {{ $value }} (threshold: 800)"
+
+      # Order Latency Warning
+      - alert: HighOrderLatency
+        expr: |
+          histogram_quantile(0.95, rate(trading_order_latency_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          team: trading
+        annotations:
+          summary: "High order execution latency"
+          description: "95th percentile order latency is {{ $value }}s"
+
+  # =============================================================================
+  # INFO ALERTS - Informational (daily digest)
+  # =============================================================================
+  - name: info
+    interval: 60s
+    rules:
+      # Strategy Restart
+      - alert: StrategyRestarted
+        expr: |
+          increase(trading_strategy_restart_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: info
+          team: trading
+        annotations:
+          summary: "Strategy restarted"
+          description: "Strategy {{ $labels.strategy_id }} has restarted in the last hour"
+
+      # Rate Limit Hit
+      - alert: RateLimitHits
+        expr: |
+          sum(increase(http_requests_total{service="trading-backend",status="429"}[1h])) > 100
+        for: 0m
+        labels:
+          severity: info
+          team: ops
+        annotations:
+          summary: "High rate limit hits"
+          description: "{{ $value }} rate limit violations in the last hour"
+
+      # Deployment Event
+      - alert: DeploymentOccurred
+        expr: |
+          increase(deployment_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: info
+          team: ops
+        annotations:
+          summary: "Deployment detected"
+          description: "Deployment to {{ $labels.environment }} occurred"

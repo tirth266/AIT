@@ -1,0 +1,298 @@
+# =============================================================================
+# FULL TRADING PLATFORM WITH ELK STACK
+# =============================================================================
+# Complete infrastructure including:
+# - Backend, Frontend, MongoDB, Redis, Nginx
+# - Elasticsearch, Logstash, Kibana, Filebeat
+#
+# Usage:
+#   docker-compose -f docker-compose.full.yml up -d
+#   docker-compose -f docker-compose.full.yml logs -f
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # MONGODB - Primary Database
+  # =============================================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: trading-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-trading_db}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER:-trading_admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-change_me_in_production}
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/mongod.conf:/etc/mongod.conf:ro
+    ports:
+      - "27017:27017"
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =============================================================================
+  # REDIS - Caching, Sessions, Pub/Sub
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # BACKEND - Flask Application
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-backend
+    restart: unless-stopped
+    environment:
+      FLASK_ENV: ${FLASK_ENV:-production}
+      FLASK_DEBUG: "0"
+      PORT: 5000
+      HOST: 0.0.0.0
+
+      MONGO_URI: mongodb://${MONGO_USER:-trading_admin}:${MONGO_PASSWORD:-change_me_in_production}@mongodb:27017/${MONGO_DB_NAME:-trading_db}?authSource=admin
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-trading_db}
+
+      REDIS_URL: redis://:@redis:6379/0
+      CELERY_BROKER_URL: redis://:@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:@redis:6379/2
+      SOCKETIO_MESSAGE_QUEUE: redis://:@redis:6379/3
+
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production-min-32-chars}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-me-in-production-min-32-chars}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-}
+
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://your-domain.com,http://localhost:3000}
+
+      RATELIMIT_ENABLED: "true"
+      RATELIMIT_DEFAULT: "100/minute"
+
+      TRADING_MODE: ${TRADING_MODE:-paper}
+      PAPER_BALANCE: ${PAPER_BALANCE:-100000}
+
+      RISK_MAX_DAILY_LOSS_PERCENT: ${RISK_MAX_DAILY_LOSS_PERCENT:-5.0}
+      RISK_PER_TRADE_PERCENT: ${RISK_PER_TRADE_PERCENT:-1.0}
+      RISK_MAX_OPEN_POSITIONS: ${RISK_MAX_OPEN_POSITIONS:-3}
+      RISK_MAX_CONSECUTIVE_LOSSES: ${RISK_MAX_CONSECUTIVE_LOSSES:-3}
+      RISK_MAX_DRAWDOWN_PERCENT: ${RISK_MAX_DRAWDOWN_PERCENT:-10.0}
+      RISK_TRADE_COOLDOWN_MINUTES: ${RISK_TRADE_COOLDOWN_MINUTES:-5}
+
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      ENABLE_LOGSTASH: ${ENABLE_LOGSTASH:-false}
+      LOGSTASH_HOST: ${LOGSTASH_HOST:-logstash}
+      LOGSTASH_PORT: ${LOGSTASH_PORT:-5044}
+      AUDIT_SECRET_KEY: ${AUDIT_SECRET_KEY:-change-me-audit-key-min-32-characters}
+      AUDIT_BATCH_SIZE: ${AUDIT_BATCH_SIZE:-10}
+
+      OWNER_USERNAME: ${OWNER_USERNAME:-admin}
+      OWNER_PASSWORD_HASH: ${OWNER_PASSWORD_HASH:-}
+    volumes:
+      - ./backend/app:/app/app:ro
+      - backend_logs:/app/logs
+    ports:
+      - "5000:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # FILEBEAT - Log Shipper (sidecar for backend)
+  # =============================================================================
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.12.0
+    container_name: trading-filebeat
+    restart: unless-stopped
+    volumes:
+      - ./docker/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - backend_logs:/app/logs:ro
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+    networks:
+      - trading-network
+    depends_on:
+      - backend
+
+  # =============================================================================
+  # CELERY WORKER - Async Task Processing
+  # =============================================================================
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: trading-celery
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      FLASK_ENV: production
+      MONGO_URI: mongodb://${MONGO_USER:-trading_admin}:${MONGO_PASSWORD:-change_me_in_production}@mongodb:27017/${MONGO_DB_NAME:-trading_db}?authSource=admin
+      REDIS_URL: redis://:@redis:6379/0
+      CELERY_BROKER_URL: redis://:@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:@redis:6379/2
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ./backend/app:/app/app:ro
+    depends_on:
+      - redis
+      - mongodb
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # FRONTEND - React Application
+  # =============================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: /api
+        VITE_WS_URL: ws://localhost:5000
+    container_name: trading-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3000:80"
+    networks:
+      - trading-network
+    depends_on:
+      - backend
+
+  # =============================================================================
+  # NGINX - Reverse Proxy & Load Balancer
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: trading-nginx
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD", "nginx -t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # ELASTICSEARCH - Search & Analytics
+  # =============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: trading-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g -XX:+UseG1GC"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - trading-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD:-changeme_in_production} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # =============================================================================
+  # LOGSTASH - Data Processing Pipeline
+  # =============================================================================
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.12.0
+    container_name: trading-logstash
+    restart: unless-stopped
+    environment:
+      - LS_JAVA_OPTS=-Xms1g -Xmx1g -XX:+UseG1GC
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+    volumes:
+      - ./docker/logstash/pipelines:/usr/share/logstash/pipeline:ro
+      - ./docker/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+    networks:
+      - trading-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # =============================================================================
+  # KIBANA - Visualization
+  # =============================================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: trading-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+    ports:
+      - "5601:5601"
+    networks:
+      - trading-network
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+networks:
+  trading-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  backend_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  elasticsearch_data:
+    driver: local

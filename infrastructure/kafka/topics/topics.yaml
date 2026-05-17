@@ -1,0 +1,206 @@
+# =============================================================================
+# KAFKA TOPIC CONFIGURATION
+# =============================================================================
+# Topic definitions with partitions, retention, and replication settings
+# Apply with: kafka-topics.sh --create --zookeeper zookeeper:2181 --topic-config-file topics.yaml
+
+topics:
+  # =============================================================================
+  # TICK STREAMS - Market Data
+  # =============================================================================
+  - name: ticks.raw
+    partitions: 16
+    replication_factor: 3
+    config:
+      retention.ms: 604800000  # 7 days
+      retention.bytes: 10737418240  # 10GB
+      segment.bytes: 104857600  # 100MB
+      segment.ms: 86400000  # 1 day
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  - name: ticks.processed
+    partitions: 16
+    replication_factor: 3
+    config:
+      retention.ms: 2592000000  # 30 days
+      retention.bytes: 53687091200  # 50GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # ORDER STREAMS - Order Lifecycle
+  # =============================================================================
+  - name: orders.created
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 7776000000  # 90 days
+      retention.bytes: 21474836480  # 20GB
+      cleanup.policy: delete
+      compression.type: snappy
+      min.insync.replicas: 2
+
+  - name: orders.status
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 7776000000  # 90 days
+      retention.bytes: 10737418240  # 10GB
+      cleanup.policy: delete
+      compression.type: snappy
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # TRADE STREAMS - Trade Execution (SEBI Requirement - 7 Years)
+  # =============================================================================
+  - name: trades.executed
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 220752000000  # 7 years
+      retention.bytes: -1  # unlimited
+      cleanup.policy: compact  # compaction for deduplication
+      compression.type: zstd
+      min.insync.replicas: 2
+      segment.ms: 604800000  # 7 days
+
+  - name: trades.reconciled
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 220752000000  # 7 years
+      retention.bytes: -1
+      cleanup.policy: compact
+      compression.type: zstd
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # RISK STREAMS - Risk Management
+  # =============================================================================
+  - name: risk.events
+    partitions: 4
+    replication_factor: 3
+    config:
+      retention.ms: 2592000000  # 30 days
+      retention.bytes: 10737418240  # 10GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  - name: risk.position
+    partitions: 4
+    replication_factor: 3
+    config:
+      retention.ms: 2592000000  # 30 days
+      retention.bytes: 5368709120  # 5GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # SIGNAL STREAMS - Strategy Signals
+  # =============================================================================
+  - name: signals.generated
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 7776000000  # 90 days
+      retention.bytes: 10737418240  # 10GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  - name: signals.executed
+    partitions: 8
+    replication_factor: 3
+    config:
+      retention.ms: 7776000000  # 90 days
+      retention.bytes: 10737418240  # 10GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # SYSTEM STREAMS - Health and Metadata
+  # =============================================================================
+  - name: system.health
+    partitions: 2
+    replication_factor: 3
+    config:
+      retention.ms: 604800000  # 7 days
+      retention.bytes: 1073741824  # 1GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # AUDIT STREAMS - SEBI Compliance (10 Years)
+  # =============================================================================
+  - name: audit.trading
+    partitions: 4
+    replication_factor: 3
+    config:
+      retention.ms: 315360000000  # 10 years
+      retention.bytes: -1
+      cleanup.policy: compact
+      compression.type: zstd
+      min.insync.replicas: 2
+      max.message.bytes: 1048576  # 1MB for audit records
+
+  - name: audit.user
+    partitions: 4
+    replication_factor: 3
+    config:
+      retention.ms: 315360000000  # 10 years
+      retention.bytes: -1
+      cleanup.policy: compact
+      compression.type: zstd
+      min.insync.replicas: 2
+
+  # =============================================================================
+  # DEAD LETTER QUEUE - Failed Events
+  # =============================================================================
+  - name: dlq.errors
+    partitions: 2
+    replication_factor: 3
+    config:
+      retention.ms: 2592000000  # 30 days
+      retention.bytes: 5368709120  # 5GB
+      cleanup.policy: delete
+      compression.type: lz4
+      min.insync.replicas: 2
+
+# =============================================================================
+# CONSUMER GROUPS
+# =============================================================================
+consumer_groups:
+  - group_id: tick-processor
+    topics: [ticks.raw]
+    offset_reset: earliest
+
+  - group_id: order-handler
+    topics: [orders.created, orders.status]
+    offset_reset: earliest
+
+  - group_id: trade-processor
+    topics: [trades.executed]
+    offset_reset: earliest
+
+  - group_id: risk-engine
+    topics: [trades.executed, risk.events]
+    offset_reset: earliest
+
+  - group_id: audit-logger
+    topics: [audit.trading, audit.user]
+    offset_reset: earliest
+
+  - group_id: analytics
+    topics: [ticks.processed, trades.executed]
+    offset_reset: latest
+
+  - group_id: signal-processor
+    topics: [signals.generated]
+    offset_reset: earliest

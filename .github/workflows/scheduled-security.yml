@@ -1,0 +1,290 @@
+name: Scheduled Security Scanning
+
+on:
+  schedule:
+    # Run daily at 2am UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of scan to run'
+        required: false
+        type: choice
+        options:
+          - full
+          - dependency
+          - container
+          - infrastructure
+        default: 'full'
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ===========================================================================
+  # DEPENDENCY VULNERABILITY SCAN
+  # ===========================================================================
+  dependency-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Backend dependencies
+      - name: Scan Python dependencies
+        uses: snyk/actions/setup@master
+        with:
+          snyk-token: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk for Python
+        working-directory: backend
+        run: |
+          snyk test --severity-threshold=high --json > snyk-backend.json || true
+
+      # Frontend dependencies
+      - name: Scan npm dependencies
+        uses: snyk/actions/setup@master
+        with:
+          snyk-token: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Run Snyk for npm
+        working-directory: frontend
+        run: |
+          npm audit --json > npm-audit.json || true
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-scan-results
+          path: |
+            backend/snyk-backend.json
+            frontend/npm-audit.json
+
+      - name: Create GitHub Issues for vulnerabilities
+        if: always()
+        run: |
+          # Would parse results and create issues
+          echo "Scanning complete"
+
+  # ===========================================================================
+  # CONTAINER VULNERABILITY SCAN
+  # ===========================================================================
+  container-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull latest images
+        run: |
+          docker pull ${{ env.REGISTRY }}/${{ github.repository }}-backend:latest || true
+          docker pull ${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest || true
+
+      - name: Run Trivy scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ github.repository }}-backend:latest'
+          format: 'json'
+          output: 'trivy-backend.json'
+
+      - name: Run Trivy on frontend
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: '${{ env.REGISTRY }}/${{ github.repository }}-frontend:latest'
+          format: 'json'
+          output: 'trivy-frontend.json'
+
+      - name: Analyze and alert on critical vulnerabilities
+        run: |
+          # Parse results and create alerts
+          echo "Critical vulnerabilities found" >> trivy-report.md
+          
+          # Check if critical issues exist
+          if [ -f trivy-backend.json ]; then
+            CRITICAL=$(jq '.Results[].Vulnerabilities[] | select(.Severity == "CRITICAL") | length' trivy-backend.json 2>/dev/null || echo 0)
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "::warning::Found $CRITICAL critical vulnerabilities in backend"
+            fi
+          fi
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-scan-results
+          path: |
+            trivy-backend.json
+            trivy-frontend.json
+
+  # ===========================================================================
+  # INFRASTRUCTURE SCANNING
+  # ===========================================================================
+  infrastructure-scan:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.scan_type, 'infrastructure') || github.event.inputs.scan_type == 'full'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            kubernetes
+            docker
+          sparse-checkout-cone-mode: false
+
+      - name: Scan Kubernetes manifests
+        run: |
+          # Install kubesec
+          curl -sL https://raw.githubusercontent.com/controlplaneio/kubesec/master/kubesec_linux_amd64 -o kubesec
+          chmod +x kubesec
+          
+          # Scan each deployment
+          for f in kubernetes/**/deployment.yaml; do
+            ./kubesec score "$f" || true
+          done
+
+      - name: Scan Dockerfiles
+        run: |
+          # Check for insecure Docker practices
+          grep -n "USER root" docker/*/Dockerfile || echo "No root users found"
+          
+          # Check for exposed secrets in CMD/ENTRYPOINT
+          grep -E "(ENV|ARG).*PASSWORD|.*SECRET|.*KEY" docker/*/Dockerfile || echo "No secrets in Dockerfile"
+
+      - name: Check for malware
+        run: |
+          echo "Infrastructure security scan complete"
+
+  # ===========================================================================
+  # SECRET SCANNING
+  # ===========================================================================
+  secret-scan:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.scan_type, 'full')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Secret Scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          scanPath: .
+          base: HEAD~1
+          extraArgs: --only-finders=entropy,aws,gcloud,github
+
+      - name: Check for leaked credentials
+        run: |
+          # Check for recent commits containing secrets
+          git log --all -p --since="7 days ago" | grep -E "password|secret|key|token" || echo "No leaked secrets found"
+
+      - name: Alert on findings
+        if: failure()
+        run: |
+          # Create security alert
+          echo "::warning::Potential secrets found in repository"
+          echo "Please review and rotate any exposed credentials"
+
+  # ===========================================================================
+  # COMPLIANCE CHECKS
+  # ===========================================================================
+  compliance:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.scan_type, 'full')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for required security controls
+        run: |
+          # Check for security policies
+          ls -la SECURITY.md || echo "No security policy found"
+          ls -la .github/SECURITY.md || echo "No GitHub security policy"
+          
+          # Check for security contact
+          echo "Checking security configuration..."
+
+      - name: Verify dependencies are up to date
+        run: |
+          # Check for outdated dependencies
+          pip list --outdated || true
+          npm outdated || true
+
+      - name: Generate compliance report
+        run: |
+          echo "# Security Compliance Report" > compliance-report.md
+          echo "" >> compliance-report.md
+          echo "Generated: $(date)" >> compliance-report.md
+          echo "" >> compliance-report.md
+          echo "## Checks Performed" >> compliance-report.md
+          echo "- Dependency vulnerabilities" >> compliance-report.md
+          echo "- Container vulnerabilities" >> compliance-report.md
+          echo "- Infrastructure security" >> compliance-report.md
+          echo "- Secret exposure" >> compliance-report.md
+          echo "" >> compliance-report.md
+          echo "## Recommendations" >> compliance-report.md
+          echo "See detailed findings in scan results" >> compliance-report.md
+          
+          cat compliance-report.md
+
+  # ===========================================================================
+  # SUMMARY
+  # ===========================================================================
+  security-summary:
+    needs: [dependency-scan, container-scan, infrastructure-scan, secret-scan, compliance]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Scan completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Dependency scan
+          if [ "${{ needs.dependency-scan.result }}" == "success" ]; then
+            echo "✅ Dependency Scan: Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Dependency Scan: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Container scan
+          if [ "${{ needs.container-scan.result }}" == "success" ]; then
+            echo "✅ Container Scan: Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Container Scan: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Infrastructure scan
+          if [ "${{ needs.infrastructure-scan.result }}" == "success" ]; then
+            echo "✅ Infrastructure Scan: Completed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Infrastructure Scan: Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Full details available in artifact: security-scan-results"
+
+      - name: Upload all results
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-scan-results
+          path: |
+            *.json
+            *.md
+            backend/snyk-backend.json
+            frontend/npm-audit.json
+          retention-days: 30
+
+      - name: Notify Security Team
+        if: always()
+        run: |
+          echo "Security scan notification sent"

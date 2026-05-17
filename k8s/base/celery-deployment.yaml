@@ -1,0 +1,107 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trading-celery
+  namespace: trading-platform
+  labels:
+    app: trading-celery
+    component: worker
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: trading-celery
+  template:
+    metadata:
+      labels:
+        app: trading-celery
+        component: worker
+    spec:
+      serviceAccountName: trading-app
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: celery
+          image: trading-platform/backend:latest
+          imagePullPolicy: Always
+          command: ["celery", "-A", "app.celery_app", "worker", "--loglevel=info", "--concurrency=4"]
+          envFrom:
+            - configMapRef:
+                name: trading-app-config
+          env:
+            - name: MONGO_URI
+              valueFrom:
+                secretKeyRef:
+                  name: trading-db-secret
+                  key: mongo-uri
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: trading-db-secret
+                  key: redis-url
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: trading-app-secret
+                  key: SECRET_KEY
+          resources:
+            requests:
+              cpu: 1000m
+              memory: 2Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - celery -A app.celery_app inspect ping
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - celery -A app.celery_app inspect active
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: trading-celery-hpa
+  namespace: trading-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: trading-celery
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: External
+      external:
+        metric:
+          name: redis_keyspace_hits_total
+          selector:
+            matchLabels:
+              app: trading-platform
+        target:
+          type: AverageValue
+          averageValue: "10000"

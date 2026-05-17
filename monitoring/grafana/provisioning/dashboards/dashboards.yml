@@ -1,0 +1,18 @@
+# Grafana dashboards provisioning
+# Auto-provision dashboards from JSON files
+
+apiVersion: 1
+
+providers:
+  # Dashboards from filesystem
+  - name: 'Trading Platform Dashboards'
+    orgId: 1
+    folder: 'Trading Platform'
+    folderUid: 'trading-platform'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

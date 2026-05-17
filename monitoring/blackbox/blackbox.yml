@@ -1,0 +1,46 @@
+# Blackbox Exporter Configuration
+# HTTP/HTTPS/TCP probing for uptime monitoring
+
+modules:
+  http_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: "ip4"
+      method: GET
+      fail_if_body_matches_regexp:
+        - "Error"
+        - "Not Found"
+      fail_if_body_not_matches_regexp:
+        - "200 OK"
+
+  http_post_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      preferred_ip_protocol: "ip4"
+      method: POST
+      headers:
+        Content-Type: application/json
+
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+
+  dns:
+    prober: dns
+    timeout: 5s
+    dns:
+      preferred_ip_protocol: "ip4"
+      validate_answer_rrs:
+        fail_if_matches_regexp:
+          - ".*localhost$"
+      validate_authority_rrs:
+        fail_if_matches_regexp:
+          - ".*localhost$"
+
+  icmp:
+    prober: icmp
+    timeout: 5s
+    icmp:
+      preferred_ip_protocol: "ip4"

@@ -1,0 +1,193 @@
+# =============================================================================
+# ELK STACK FOR TRADING PLATFORM - INSTITUTIONAL-GRADE LOGGING
+# =============================================================================
+# Includes: Elasticsearch, Logstash, Kibana, Beats (Filebeat)
+#
+# Usage:
+#   docker-compose -f docker-compose.elk.yml up -d
+#   docker-compose -f docker-compose.elk.yml down
+#
+# Access:
+#   Kibana: http://localhost:5601
+#   Elasticsearch: http://localhost:9200
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # ELASTICSEARCH - Distributed Search & Analytics
+  # =============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: trading-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - xpack.security.authc.api_key.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g -XX:+UseG1GC -XX:G1ReservePercent=25 -XX:InitiatingHeapOccupancyPercent=30"
+      - indices.queries.cache.size=15%
+      - indices.memory.index_buffer_size=20%
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+      - elasticsearch_logs:/usr/share/elasticsearch/logs
+      - ./docker/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - ./docker/elasticsearch/jvm.options:/usr/share/elasticsearch/config/jvm.options:ro
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - trading-elk
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -u elastic:${ELASTIC_PASSWORD:-changeme_in_production} http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # =============================================================================
+  # KIBANA - Visualize & Analyze Logs
+  # =============================================================================
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: trading-kibana
+    restart: unless-stopped
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=5601
+      - LOGGING_DEST=stdout
+      - LOGGING_VERBOSE=true
+      - TELEMETRY_ENABLED=false
+      - NEWS_FEED_ENABLED=false
+    volumes:
+      - ./docker/kibana/kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - kibana_data:/usr/share/kibana/data
+    ports:
+      - "5601:5601"
+    networks:
+      - trading-elk
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # =============================================================================
+  # LOGSTASH - Data Processing Pipeline
+  # =============================================================================
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.12.0
+    container_name: trading-logstash
+    restart: unless-stopped
+    environment:
+      - LS_JAVA_OPTS=-Xms1g -Xmx1g -XX:+UseG1GC
+      - ELASTICSEARCH_HOST=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=elastic
+      - ELASTICSEARCH_PASSWORD=${ELASTIC_PASSWORD:-changeme_in_production}
+      - PIPELINE_WORKERS=4
+      - PIPELINE_BATCH_SIZE=250
+      - PIPELINE_BATCH_DELAY=50
+    volumes:
+      - ./docker/logstash/pipelines:/usr/share/logstash/pipeline:ro
+      - ./docker/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - logstash_logs:/usr/share/logstash/logs
+    ports:
+      - "5044:5044"
+      - "9600:9600"
+      - "50000:50000"
+    networks:
+      - trading-elk
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9600/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # =============================================================================
+  # FILEBEAT - Log Shipper (runs alongside backend)
+  # =============================================================================
+  # Note: Filebeat runs as a sidecar to the backend container
+
+  # =============================================================================
+  # APM SERVER - Application Performance Monitoring (Optional)
+  # =============================================================================
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:8.12.0
+    container_name: trading-apm
+    restart: unless-stopped
+    environment:
+      - output.elasticsearch.hosts=["elasticsearch:9200"]
+      - output.elasticsearch.username=elastic
+      - output.elasticsearch.password=${ELASTIC_PASSWORD:-changeme_in_production}
+      - apm-server.host=0.0.0.0:8200
+      - apm-server.secret_token=${APM_SECRET_TOKEN:-changeme_secret_token}
+    volumes:
+      - ./docker/apm/apm-server.yml:/usr/share/apm-server/apm-server.yml:ro
+    ports:
+      - "8200:8200"
+    networks:
+      - trading-elk
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+
+  # =============================================================================
+  # ELASTIC CURATOR - Index Lifecycle Management
+  # =============================================================================
+  elastic-curator:
+    image: busybox
+    container_name: trading-curator
+    restart: unless-stopped
+    volumes:
+      - ./docker/curator/action_file.yml:/etc curator/action.yml:ro
+      - ./docker/curator/curator.yml:/usr/local/bin/curator.yml:ro
+    entrypoint: |
+      sh -c "echo 'Curator scheduled via cron - see docker/curator/crontab'"
+    networks:
+      - trading-elk
+
+networks:
+  trading-elk:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  elasticsearch_data:
+    driver: local
+  elasticsearch_logs:
+    driver: local
+  kibana_data:
+    driver: local
+  logstash_logs:
+    driver: local

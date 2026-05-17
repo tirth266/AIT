@@ -1,0 +1,85 @@
+actions:
+  1:
+    action: delete_indices
+    description: >-
+      Delete trading indices older than retention period
+    options:
+      timeout_override: 300
+      continue_if_exception: true
+    filters:
+      - filtertype: pattern
+        kind: prefix
+        value: trading-
+      - filtertype: age
+        source: creation_date
+        direction: older
+        unit: days
+        unit_count: 90
+
+  2:
+    action: forcemerge
+    description: >-
+      Force merge trading indices to optimize storage
+    options:
+      max_num_segments: 1
+      timeout: 300
+    filters:
+      - filtertype: pattern
+        kind: prefix
+        value: trading-
+      - filtertype: age
+        source: creation_date
+        direction: older
+        unit: days
+        unit_count: 7
+
+  3:
+    action: shrink
+    description: >-
+      Shrink old trading indices to single shard
+    options:
+      number_of_shards: 1
+      shrink_node: DETERMINISTIC
+      timeout: 300
+    filters:
+      - filtertype: pattern
+        kind: prefix
+        value: trading-
+      - filtertype: age
+        source: creation_date
+        direction: older
+        unit: days
+        unit_count: 30
+
+  4:
+    action: close
+    description: >-
+      Close indices older than 1 year to save resources
+    options:
+      delete_aliases: false
+      skip_if_closed: true
+    filters:
+      - filtertype: pattern
+        kind: prefix
+        value: trading-
+      - filtertype: age
+        source: creation_date
+        direction: older
+        unit: days
+        unit_count: 365
+
+  5:
+    action: delete_indices
+    description: >-
+      Delete closed indices older than 7 years (compliance)
+    options:
+      timeout_override: 300
+    filters:
+      - filtertype: pattern
+        kind: prefix
+        value: trading-archived-
+      - filtertype: age
+        source: creation_date
+        direction: older
+        unit: days
+        unit_count: 2555

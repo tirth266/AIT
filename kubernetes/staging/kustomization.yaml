@@ -1,0 +1,66 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: trading-platform-staging
+
+resources:
+  - ../base
+
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: backend
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: frontend
+  - patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+    target:
+      kind: Deployment
+      name: websocket
+  - patch: |-
+      - op: replace
+        path: /metadata/annotations
+        value:
+          kubernetes.io/ingress.class: nginx
+          nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    target:
+      kind: Ingress
+      name: trading-platform-ingress
+
+replicas:
+  - name: backend
+    count: 2
+  - name: frontend
+    count: 2
+  - name: websocket
+    count: 2
+
+images:
+  - name: ghcr.io/trading-platform/backend
+    newTag: staging
+  - name: ghcr.io/trading-platform/frontend
+    newTag: staging
+
+configMapGenerator:
+  - name: backend-config
+    behavior: merge
+    literals:
+      - ENV=staging
+      - LOG_LEVEL=DEBUG
+      - DATABASE_POOL_SIZE=10
+
+namePrefix: staging-
+
+commonLabels:
+  environment: staging

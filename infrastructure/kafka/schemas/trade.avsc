@@ -1,0 +1,152 @@
+{
+  "type": "record",
+  "name": "TradeEvent",
+  "namespace": "com.trading.platform.events",
+  "doc": "Trade execution event - SEBI audit requirement",
+  "fields": [
+    {
+      "name": "trade_id",
+      "type": "string",
+      "doc": "Unique trade identifier"
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "doc": "Related order ID"
+    },
+    {
+      "name": "position_id",
+      "type": ["string", "null"],
+      "doc": "Position ID for position tracking"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "User ID"
+    },
+    {
+      "name": "strategy_id",
+      "type": ["string", "null"],
+      "doc": "Strategy ID if automated"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol"
+    },
+    {
+      "name": "exchange",
+      "type": {
+        "type": "enum",
+        "name": "Exchange",
+        "symbols": ["NSE", "BSE", "NSE_FO", "BSE_FO"]
+      }
+    },
+    {
+      "name": "transaction_type",
+      "type": {
+        "type": "enum",
+        "name": "TransactionType",
+        "symbols": ["BUY", "SELL"]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "int",
+      "doc": "Trade quantity"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Execution price"
+    },
+    {
+      "name": "value",
+      "type": "double",
+      "doc": "Trade value (quantity * price)"
+    },
+    {
+      "name": "brokerage",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Brokerage charged"
+    },
+    {
+      "name": "stt",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Securities Transaction Tax"
+    },
+    {
+      "name": "gst",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Goods and Services Tax"
+    },
+    {
+      "name": "stamp_duty",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Stamp duty"
+    },
+    {
+      "name": "other_charges",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Other applicable charges"
+    },
+    {
+      "name": "total_charges",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Total charges"
+    },
+    {
+      "name": "pnl",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Realized P&L for this trade"
+    },
+    {
+      "name": "pnl_percent",
+      "type": "double",
+      "default": 0.0,
+      "doc": "P&L percentage"
+    },
+    {
+      "name": "mode",
+      "type": {
+        "type": "enum",
+        "name": "TradingMode",
+        "symbols": ["PAPER", "LIVE"]
+      }
+    },
+    {
+      "name": "broker",
+      "type": "string",
+      "doc": "Broker name"
+    },
+    {
+      "name": "broker_trade_id",
+      "type": ["string", "null"],
+      "doc": "Broker's trade confirmation ID"
+    },
+    {
+      "name": "execution_time",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Execution timestamp"
+    },
+    {
+      "name": "created_at",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    }
+  ],
+  "version": 1,
+  "doc": "Immutable trade record - SEBI requirement for 7 year retention"
+}

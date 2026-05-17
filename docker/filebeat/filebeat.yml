@@ -1,0 +1,51 @@
+filebeat.inputs:
+  - type: log
+    enabled: true
+    paths:
+      - /app/logs/*.log
+    fields:
+      service: trading-platform
+      environment: ${FLASK_ENV:production}
+    fields_under_root: true
+    json:
+      keys_under_root: true
+      overwrite_keys: true
+      add_error_key: true
+      message_key: message
+    multiline:
+      pattern: '^\d{4}-\d{2}-\d{2}'
+      negate: true
+      match: after
+
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/nginx/*.log
+    fields:
+      service: nginx
+    fields_under_root: true
+
+processors:
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  - add_docker_metadata: ~
+  - add_fields:
+      target: ''
+      fields:
+        cluster.name: trading-cluster
+
+output.logstash:
+  hosts: ["logstash:5044"]
+  ssl.enabled: false
+
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+monitoring.enabled: true
+monitoring.elasticsearch:
+  hosts: ["elasticsearch:9200"]

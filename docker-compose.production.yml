@@ -1,0 +1,336 @@
+# =============================================================================
+# PRODUCTION DOCKER COMPOSE
+# =============================================================================
+# Complete production infrastructure with all components
+# Usage: docker-compose -f docker-compose.production.yml up -d
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # BACKEND SERVICES
+  # =============================================================================
+  backend:
+    image: trading-platform-backend:latest
+    container_name: trading-backend
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=production
+      - FLASK_DEBUG=0
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/trading_db}
+      - REDIS_URL=redis://redis:6379/0
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-1:29092,kafka-2:29092,kafka-3:29092
+      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+    ports:
+      - "5000:5000"
+    networks:
+      - trading-network
+    depends_on:
+      - mongodb
+      - redis
+      - kafka-1
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # =============================================================================
+  # CELERY WORKER
+  # =============================================================================
+  celery-worker:
+    image: trading-platform-backend:latest
+    container_name: trading-celery
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/trading_db}
+      - REDIS_URL=redis://redis:6379/0
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-1:29092,kafka-2:29092,kafka-3:29092
+    networks:
+      - trading-network
+    depends_on:
+      - redis
+      - mongodb
+      - kafka-1
+
+  # =============================================================================
+  # KAFKA CONSUMER SERVICE
+  # =============================================================================
+  kafka-consumer:
+    image: trading-platform-backend:latest
+    container_name: trading-kafka-consumer
+    restart: unless-stopped
+    command: python -m app.kafka.consumer
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-1:29092,kafka-2:29092,kafka-3:29092
+      - KAFKA_CONSUMER_GROUP=tick-processor
+      - MONGO_URI=${MONGO_URI:-mongodb://mongodb:27017/trading_db}
+      - REDIS_URL=redis://redis:6379/0
+    networks:
+      - trading-network
+    depends_on:
+      - kafka-1
+
+  # =============================================================================
+  # FRONTEND
+  # =============================================================================
+  frontend:
+    image: trading-platform-frontend:latest
+    container_name: trading-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    networks:
+      - trading-network
+    depends_on:
+      - backend
+
+  # =============================================================================
+  # NGINX
+  # =============================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: trading-nginx
+    restart: unless-stopped
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - trading-network
+    depends_on:
+      - backend
+      - frontend
+
+  # =============================================================================
+  # DATABASE - MONGODB
+  # =============================================================================
+  mongodb:
+    image: mongo:7.0
+    container_name: trading-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-trading_db}
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongodb/mongod.conf:/etc/mongod.conf:ro
+    command: ["-f", "/etc/mongod.conf"]
+    ports:
+      - "27017:27017"
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # REDIS
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: trading-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # KAFKA CLUSTER
+  # =============================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: trading-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+    networks:
+      - trading-network
+
+  kafka-1:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-1
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 16
+    volumes:
+      - kafka1_data:/var/lib/kafka/data
+    networks:
+      - trading-network
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-2
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 16
+    volumes:
+      - kafka2_data:/var/lib/kafka/data
+    networks:
+      - trading-network
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-3
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:29092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 16
+    volumes:
+      - kafka3_data:/var/lib/kafka/data
+    networks:
+      - trading-network
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: trading-schema-registry
+    restart: unless-stopped
+    depends_on:
+      - kafka-1
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka-1:29092
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # MONITORING STACK
+  # =============================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: trading-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infrastructure/monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+    networks:
+      - trading-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: trading-grafana
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./infrastructure/monitoring/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    networks:
+      - trading-network
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: trading-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    networks:
+      - trading-network
+
+  # =============================================================================
+  # LOGGING STACK
+  # =============================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.10.0
+    container_name: trading-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - trading-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.10.0
+    container_name: trading-kibana
+    restart: unless-stopped
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - trading-network
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.10.0
+    container_name: trading-logstash
+    restart: unless-stopped
+    volumes:
+      - ./infrastructure/monitoring/logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    depends_on:
+      - elasticsearch
+    networks:
+      - trading-network
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  trading-network:
+    driver: bridge
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  mongodb_data:
+  redis_data:
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:
+  zookeeper_data:
+  prometheus_data:
+  grafana_data:
+  elasticsearch_data:

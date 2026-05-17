@@ -1,0 +1,94 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: trading-ingress
+  namespace: trading-platform
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "75"
+    nginx.ingress.kubernetes.io/websocket-services: "trading-backend"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      server_tokens off;
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+spec:
+  tls:
+    - hosts:
+        - trading.yourdomain.com
+        - api.trading.yourdomain.com
+      secretName: trading-tls
+  rules:
+    - host: trading.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: trading-frontend
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: trading-backend
+                port:
+                  number: 5000
+          - path: /socket.io
+            pathType: Prefix
+            backend:
+              service:
+                name: trading-backend
+                port:
+                  number: 5000
+---
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: k8s.io/ingress-nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+  namespace: trading-platform
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+  namespace: trading-platform
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@yourdomain.com
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+      - http01:
+          ingress:
+            class: nginx

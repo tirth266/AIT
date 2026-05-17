@@ -1,0 +1,159 @@
+{
+  "type": "record",
+  "name": "OrderEvent",
+  "namespace": "com.trading.platform.events",
+  "doc": "Order lifecycle event schema",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique event identifier"
+    },
+    {
+      "name": "order_id",
+      "type": "string",
+      "doc": "Platform order ID"
+    },
+    {
+      "name": "broker_order_id",
+      "type": ["string", "null"],
+      "doc": "Broker order ID (after submission)"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "User who placed the order"
+    },
+    {
+      "name": "strategy_id",
+      "type": ["string", "null"],
+      "doc": "Strategy that generated the order"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol"
+    },
+    {
+      "name": "exchange",
+      "type": {
+        "type": "enum",
+        "name": "Exchange",
+        "symbols": ["NSE", "BSE", "NSE_FO", "BSE_FO"]
+      }
+    },
+    {
+      "name": "transaction_type",
+      "type": {
+        "type": "enum",
+        "name": "TransactionType",
+        "symbols": ["BUY", "SELL"]
+      }
+    },
+    {
+      "name": "order_type",
+      "type": {
+        "type": "enum",
+        "name": "OrderType",
+        "symbols": ["MARKET", "LIMIT", "SL", "SL_M"]
+      }
+    },
+    {
+      "name": "product_type",
+      "type": {
+        "type": "enum",
+        "name": "ProductType",
+        "symbols": ["CNC", "MIS", "NRML"]
+      }
+    },
+    {
+      "name": "quantity",
+      "type": "int",
+      "doc": "Order quantity"
+    },
+    {
+      "name": "filled_quantity",
+      "type": "int",
+      "default": 0,
+      "doc": "Filled quantity"
+    },
+    {
+      "name": "cancelled_quantity",
+      "type": "int",
+      "default": 0,
+      "doc": "Cancelled quantity"
+    },
+    {
+      "name": "price",
+      "type": "double",
+      "doc": "Limit price (0 for market orders)"
+    },
+    {
+      "name": "trigger_price",
+      "type": "double",
+      "doc": "Trigger price for SL/SL-M orders"
+    },
+    {
+      "name": "average_price",
+      "type": "double",
+      "doc": "Average fill price"
+    },
+    {
+      "name": "status",
+      "type": {
+        "type": "enum",
+        "name": "OrderStatus",
+        "symbols": ["NEW", "VALIDATED", "OPEN", "PARTIALLY_FILLED", "FILLED", "CANCELLED", "REJECTED", "EXPIRED"]
+      }
+    },
+    {
+      "name": "validity",
+      "type": {
+        "type": "enum",
+        "name": "OrderValidity",
+        "symbols": ["DAY", "IOC", "GTC"]
+      }
+    },
+    {
+      "name": "mode",
+      "type": {
+        "type": "enum",
+        "name": "TradingMode",
+        "symbols": ["PAPER", "LIVE"]
+      }
+    },
+    {
+      "name": "source",
+      "type": "string",
+      "doc": "Order source: manual, strategy, api"
+    },
+    {
+      "name": "event_type",
+      "type": {
+        "type": "enum",
+        "name": "OrderEventType",
+        "symbols": ["CREATED", "SUBMITTED", "FILLED", "PARTIAL_FILL", "CANCELLED", "REJECTED", "MODIFIED", "EXPIRED"]
+      }
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      }
+    },
+    {
+      "name": "rejected_reason",
+      "type": ["string", "null"]
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {}
+    }
+  ],
+  "version": 1
+}

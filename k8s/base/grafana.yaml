@@ -1,0 +1,167 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+      - name: Elasticsearch
+        type: elasticsearch
+        access: proxy
+        url: http://elasticsearch.elastic-stack.svc.cluster.local:9200
+        database: trading-logs-*
+        jsonData:
+          timeField: timestamp
+          esVersion: 8
+          logMessageField: message
+          logLevelField: level
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+data:
+  kubernetes-pod.json: |
+    {
+      "dashboard": {
+        "title": "Kubernetes Pod Metrics",
+        "tags": ["kubernetes", "trading-platform"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "type": "graph",
+            "title": "CPU Usage",
+            "targets": [
+              {"expr": "rate(container_cpu_usage_seconds_total{pod=~\"trading-.*\"}[5m])"}
+            ]
+          },
+          {
+            "type": "graph",
+            "title": "Memory Usage",
+            "targets": [
+              {"expr": "container_memory_usage_bytes{pod=~\"trading-.*\"}"}
+            ]
+          },
+          {
+            "type": "graph",
+            "title": "Network I/O",
+            "targets": [
+              {"expr": "rate(container_network_receive_bytes_total{pod=~\"trading-.*\"}[5m])"},
+              {"expr": "rate(container_network_transmit_bytes_total{pod=~\"trading-.*\"}[5m])"}
+            ]
+          }
+        ]
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.2.0
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-secret
+                  key: admin-password
+            - name: GF_SERVER_ROOT_URL
+              value: https://grafana.trading.yourdomain.com
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: "true"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards
+              mountPath: /etc/grafana/provisioning/dashboards
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: grafana
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: grafana-secret
+  namespace: monitoring
+type: Opaque
+stringData:
+  admin-password: ${GRAFANA_PASSWORD}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: monitoring
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  tls:
+    - hosts:
+        - grafana.trading.yourdomain.com
+      secretName: grafana-tls
+  rules:
+    - host: grafana.trading.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000

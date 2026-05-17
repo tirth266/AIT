@@ -1,0 +1,195 @@
+# =============================================================================
+# PROMETHEUS ALERT RULES
+# =============================================================================
+# Alert definitions for trading platform
+
+groups:
+  - name: trading_platform_alerts
+    interval: 30s
+    rules:
+      # High priority alerts
+      - alert: TradingPlatformDown
+        expr: up{job="trading-platform"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Trading platform is down"
+          description: "Trading platform has been down for more than 1 minute"
+
+      - alert: HighOrderLatency
+        expr: histogram_quantile(0.95, rate(trading_orders_latency_seconds_bucket[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "High order placement latency"
+          description: "95th percentile order latency is {{ $value }}s (threshold: 0.1s)"
+
+      - alert: HighTickLatency
+        expr: histogram_quantile(0.99, rate(trading_tick_processing_latency_ms_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "High tick processing latency"
+          description: "99th percentile tick latency is {{ $value }}ms (threshold: 5ms)"
+
+      - alert: HighWebSocketLatency
+        expr: histogram_quantile(0.95, rate(trading_ws_latency_ms_bucket[5m])) > 20
+        for: 5m
+        labels:
+          severity: critical
+          component: performance
+        annotations:
+          summary: "High WebSocket latency"
+          description: "95th percentile WS latency is {{ $value }}ms (threshold: 20ms)"
+
+      - alert: KafkaConsumerLag
+        expr: trading_kafka_consumer_lag > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: kafka
+        annotations:
+          summary: "Kafka consumer lag is high"
+          description: "Consumer {{ $labels.group }} lag for {{ $labels.topic }} is {{ $value }}"
+
+      # Risk alerts
+      - alert: HighMarginUtilization
+        expr: trading_margin_utilization_percent > 80
+        for: 2m
+        labels:
+          severity: warning
+          component: risk
+        annotations:
+          summary: "High margin utilization"
+          description: "Margin utilization is {{ $value }}% for {{ $labels.user_id }}"
+
+      - alert: CriticalMarginUtilization
+        expr: trading_margin_utilization_percent > 95
+        for: 1m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Critical margin utilization"
+          description: "Margin utilization is {{ $value }}% - margin call likely"
+
+      - alert: DailyLossThreshold
+        expr: trading_daily_pnl < -50000
+        for: 5m
+        labels:
+          severity: critical
+          component: risk
+        annotations:
+          summary: "Daily loss threshold exceeded"
+          description: "Daily P&L is {{ $value }} INR"
+
+      # Error alerts
+      - alert: HighErrorRate
+        expr: sum(rate(trading_errors_total[5m])) by (component) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: errors
+        annotations:
+          summary: "High error rate"
+          description: "Error rate for {{ $labels.component }} is {{ $value }} errors/min"
+
+      - alert: HighOrderRejectionRate
+        expr: sum(rate(trading_order_rejections_total[5m])) > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: trading
+        annotations:
+          summary: "High order rejection rate"
+          description: "Order rejection rate is {{ $value }}/min"
+
+      # Capacity alerts
+      - alert: WebSocketConnectionsHigh
+        expr: trading_ws_connections > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: capacity
+        annotations:
+          summary: "High WebSocket connection count"
+          description: "WS connections at {{ $value }} (threshold: 1000)"
+
+      - alert: ActiveUsersHigh
+        expr: trading_active_users > 100
+        for: 10m
+        labels:
+          severity: info
+          component: capacity
+        annotations:
+          summary: "High active user count"
+          description: "{{ $value }} users currently active"
+
+  - name: infrastructure_alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "CPU usage on {{ $labels.instance }} is {{ $value }}%"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Memory usage on {{ $labels.instance }} is {{ $value }}%"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+        for: 30m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk usage on {{ $labels.instance }} is {{ $value }}%"
+
+      - alert: MongoDBDown
+        expr: up{job="mongodb"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB has been down for more than 1 minute"
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+        annotations:
+          summary: "Redis is down"
+          description: "Redis has been down for more than 1 minute"
+
+      - alert: KafkaDown
+        expr: up{job="kafka"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: messaging
+        annotations:
+          summary: "Kafka is down"
+          description: "Kafka has been down for more than 1 minute"

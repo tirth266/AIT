@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: trading-platform
+data:
+  ENV: "production"
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_MAX_OVERFLOW: "10"
+  REDIS_POOL_SIZE: "50"
+  CACHE_TTL: "300"
+  CORS_ORIGINS: "https://trading-platform.internal"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS: "1000"
+  RATE_LIMIT_WINDOW: "60"
+  WEBSOCKET_MAX_CONNECTIONS: "10000"
+  WEBSOCKET_MESSAGE_QUEUE_SIZE: "1000"
+  KAFKA_BOOTSTRAP_SERVERS: "kafka:9092"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/1"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: websocket-config
+  namespace: trading-platform
+data:
+  ENV: "production"
+  REDIS_CHANNEL_PREFIX: "ws:"
+  HEARTBEAT_INTERVAL: "30"
+  MESSAGE_BATCH_SIZE: "100"
+  MESSAGE_BATCH_INTERVAL: "10"
+  MAX_MESSAGE_SIZE: "1048576"
+  COMPRESSION_ENABLED: "true"
+  RATE_LIMIT_PER_USER: "100"
+  RATE_LIMIT_WINDOW_MS: "1000"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: trading-platform
+data:
+  VITE_API_URL: "https://api.trading-platform.internal"
+  VITE_WS_URL: "wss://ws.trading-platform.internal"
+  VITE_ENVIRONMENT: "production"
+  VITE_FEATURES_ENABLED: "true"

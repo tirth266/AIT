@@ -1,0 +1,240 @@
+# =============================================================================
+# Recording Rules - Pre-computed aggregations
+# =============================================================================
+# These rules create pre-aggregated time series for faster queries
+# and commonly used metric combinations
+# =============================================================================
+
+groups:
+  # =============================================================================
+  # HTTP API RECORDING RULES
+  # =============================================================================
+  - name: http_api
+    interval: 30s
+    rules:
+      # Request rate by endpoint
+      - record: service:http_requests_per_second:sum_rate5m
+        expr: |
+          sum by (service, endpoint, method, status) (rate(http_requests_total[5m]))
+
+      # Error rate by service
+      - record: service:http_error_rate:ratio5m
+        expr: |
+          sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (service) (rate(http_requests_total[5m]))
+
+      # Latency percentiles by service
+      - record: service:http_latency_p50:histogram5m
+        expr: |
+          histogram_quantile(0.50, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m])))
+
+      - record: service:http_latency_p95:histogram5m
+        expr: |
+          histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m])))
+
+      - record: service:http_latency_p99:histogram5m
+        expr: |
+          histogram_quantile(0.99, sum by (service, le) (rate(http_request_duration_seconds_bucket[5m])))
+
+      # Request size
+      - record: service:http_request_size_bytes_avg:sum5m
+        expr: |
+          sum by (service) (rate(http_request_size_bytes_sum[5m]))
+          /
+          sum by (service) (rate(http_request_size_bytes_count[5m]))
+
+      # Response size
+      - record: service:http_response_size_bytes_avg:sum5m
+        expr: |
+          sum by (service) (rate(http_response_size_bytes_sum[5m]))
+          /
+          sum by (service) (rate(http_response_size_bytes_count[5m]))
+
+  # =============================================================================
+  # WEBSOCKET RECORDING RULES
+  # =============================================================================
+  - name: websocket
+    interval: 30s
+    rules:
+      # Connection rate
+      - record: service:websocket_connections:max5m
+        expr: |
+          max by (service) (websocket_active_connections)
+
+      # Message throughput
+      - record: service:websocket_messages_per_second:sum_rate5m
+        expr: |
+          sum by (service, direction) (rate(websocket_messages_total[5m]))
+
+      # Latency percentiles
+      - record: service:websocket_latency_p50:histogram5m
+        expr: |
+          histogram_quantile(0.50, sum by (service, le) (rate(websocket_message_latency_seconds_bucket[5m])))
+
+      - record: service:websocket_latency_p95:histogram5m
+        expr: |
+          histogram_quantile(0.95, sum by (service, le) (rate(websocket_message_latency_seconds_bucket[5m])))
+
+      - record: service:websocket_latency_p99:histogram5m
+        expr: |
+          histogram_quantile(0.99, sum by (service, le) (rate(websocket_message_latency_seconds_bucket[5m])))
+
+  # =============================================================================
+  # TRADING RECORDING RULES
+  # =============================================================================
+  - name: trading
+    interval: 30s
+    rules:
+      # Order rate
+      - record: trading:orders_per_second:sum_rate5m
+        expr: |
+          sum by (type, status) (rate(trading_orders_total[5m]))
+
+      # Order failure rate
+      - record: trading:order_failure_rate:ratio5m
+        expr: |
+          sum (rate(trading_orders_failed_total[5m]))
+          /
+          sum (rate(trading_orders_total[5m]))
+
+      # Order latency percentiles
+      - record: trading:order_latency_p50:histogram5m
+        expr: |
+          histogram_quantile(0.50, sum by (le) (rate(trading_order_latency_seconds_bucket[5m])))
+
+      - record: trading:order_latency_p95:histogram5m
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(trading_order_latency_seconds_bucket[5m])))
+
+      - record: trading:order_latency_p99:histogram5m
+        expr: |
+          histogram_quantile(0.99, sum by (le) (rate(trading_order_latency_seconds_bucket[5m])))
+
+      # Strategy execution rate
+      - record: trading:strategy_executions_per_minute:sum_rate5m
+        expr: |
+          sum by (strategy, status) (rate(trading_strategy_executions_total[5m]))
+
+      # Strategy failure rate
+      - record: trading:strategy_failure_rate:ratio5m
+        expr: |
+          sum (rate(trading_strategy_failures_total[5m]))
+          /
+          sum (rate(trading_strategy_executions_total[5m]))
+
+      # Tick processing throughput
+      - record: trading:ticks_per_second:sum_rate5m
+        expr: |
+          sum by (symbol) (rate(trading_ticks_processed_total[5m]))
+
+      # Strategy execution time
+      - record: trading:strategy_execution_time_p95:histogram5m
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(trading_strategy_execution_time_seconds_bucket[5m])))
+
+  # =============================================================================
+  # DATABASE RECORDING RULES
+  # =============================================================================
+  - name: database
+    interval: 30s
+    rules:
+      # MongoDB query latency
+      - record: mongodb:query_latency_p50:histogram5m
+        expr: |
+          histogram_quantile(0.50, sum by (le, type) (rate(mongodb_mongod_operation_duration_seconds_bucket{type="query"}[5m])))
+
+      - record: mongodb:query_latency_p95:histogram5m
+        expr: |
+          histogram_quantile(0.95, sum by (le, type) (rate(mongodb_mongod_operation_duration_seconds_bucket{type="query"}[5m])))
+
+      - record: mongodb:query_latency_p99:histogram5m
+        expr: |
+          histogram_quantile(0.99, sum by (le, type) (rate(mongodb_mongod_operation_duration_seconds_bucket{type="query"}[5m])))
+
+      # MongoDB operations per second
+      - record: mongodb:ops_per_second:sum_rate5m
+        expr: |
+          sum by (type) (rate(mongodb_mongod_ops_total[5m]))
+
+      # MongoDB connection pool usage
+      - record: mongodb:connection_pool_usage:ratio5m
+        expr: |
+          mongodb_mongod_connections{state="active"}
+          /
+          mongodb_mongod_connections_max
+
+      # Redis memory usage ratio
+      - record: redis:memory_usage_ratio:avg5m
+        expr: |
+          avg by (instance) (redis_memory_used_bytes / redis_memory_max_bytes)
+
+      # Redis keys
+      - record: redis:keys_count:avg5m
+        expr: |
+          avg by (db) (redis_db_keys)
+
+      # Redis hit rate
+      - record: redis:hit_rate:ratio5m
+        expr: |
+          sum (rate(redis_keyspace_hits_total[5m]))
+          /
+          (sum (rate(redis_keyspace_hits_total[5m])) + sum (rate(redis_keyspace_misses_total[5m])))
+
+  # =============================================================================
+  # SYSTEM RECORDING RULES
+  # =============================================================================
+  - name: system
+    interval: 30s
+    rules:
+      # CPU usage
+      - record: system:cpu_usage_percent:avg5m
+        expr: |
+          100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+      # Memory usage
+      - record: system:memory_usage_percent:avg5m
+        expr: |
+          100 - (avg by (instance) (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100)
+
+      # Disk usage
+      - record: system:disk_usage_percent:avg5m
+        expr: |
+          100 - (avg by (instance, mountpoint) (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100)
+
+      # Load average (1 min)
+      - record: system:load1:avg5m
+        expr: |
+          avg by (instance) (node_load1)
+
+      # Network traffic
+      - record: system:network_bytes_per_second:sum_rate5m
+        expr: |
+          sum by (instance, interface) (rate(node_network_receive_bytes_total[5m]))
+          + sum by (instance, interface) (rate(node_network_transmit_bytes_total[5m]))
+
+  # =============================================================================
+  # BUSINESS METRICS RECORDING RULES
+  # =============================================================================
+  - name: business
+    interval: 60s
+    rules:
+      # Active users
+      - record: business:active_users:max5m
+        expr: |
+          max by (service) (active_users)
+
+      # Active websocket connections
+      - record: business:websocket_connections:max5m
+        expr: |
+          max by (service) (websocket_active_connections)
+
+      # Orders placed per minute
+      - record: business:orders_per_minute:sum_rate5m
+        expr: |
+          sum (rate(trading_orders_total[5m]))
+
+      # Trade volume
+      - record: business:trade_volume_usd:sum_rate5m
+        expr: |
+          sum (rate(trading_volume_usd_total[5m]))

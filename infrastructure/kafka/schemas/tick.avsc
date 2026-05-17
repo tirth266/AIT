@@ -1,0 +1,106 @@
+{
+  "type": "record",
+  "name": "Tick",
+  "namespace": "com.trading.platform.events",
+  "doc": "Market tick data schema for NSE/BSE instruments",
+  "fields": [
+    {
+      "name": "tick_id",
+      "type": "string",
+      "doc": "Unique tick identifier"
+    },
+    {
+      "name": "symbol",
+      "type": "string",
+      "doc": "Trading symbol (e.g., RELIANCE, TCS)"
+    },
+    {
+      "name": "exchange",
+      "type": {
+        "type": "enum",
+        "name": "Exchange",
+        "symbols": ["NSE", "BSE", "NSE_FO", "BSE_FO"]
+      },
+      "doc": "Exchange identifier"
+    },
+    {
+      "name": "timestamp",
+      "type": {
+        "type": "long",
+        "logicalType": "timestamp-millis"
+      },
+      "doc": "Tick timestamp in milliseconds"
+    },
+    {
+      "name": "last_price",
+      "type": "double",
+      "doc": "Last traded price"
+    },
+    {
+      "name": "last_quantity",
+      "type": "int",
+      "doc": "Last traded quantity"
+    },
+    {
+      "name": "volume",
+      "type": "long",
+      "doc": "Total volume for the day"
+    },
+    {
+      "name": "bid_price",
+      "type": "double",
+      "doc": "Best bid price"
+    },
+    {
+      "name": "bid_quantity",
+      "type": "int",
+      "doc": "Best bid quantity"
+    },
+    {
+      "name": "ask_price",
+      "type": "double",
+      "doc": "Best ask price"
+    },
+    {
+      "name": "ask_quantity",
+      "type": "int",
+      "doc": "Best ask quantity"
+    },
+    {
+      "name": "open",
+      "type": "double",
+      "doc": "Day open price"
+    },
+    {
+      "name": "high",
+      "type": "double",
+      "doc": "Day high price"
+    },
+    {
+      "name": "low",
+      "type": "double",
+      "doc": "Day low price"
+    },
+    {
+      "name": "close",
+      "type": "double",
+      "doc": "Previous day close price"
+    },
+    {
+      "name": "ltp",
+      "type": "double",
+      "doc": "Last traded price (same as last_price)"
+    },
+    {
+      "name": "change",
+      "type": "double",
+      "doc": "Price change from previous close"
+    },
+    {
+      "name": "change_percent",
+      "type": "double",
+      "doc": "Percentage change"
+    }
+  ],
+  "version": 1
+}

@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: #0D1117;
+  color: #F0F6FC;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #161B22;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #30363D;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #484F58;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+@layer components {
+  .glass {
+    @apply bg-[#161B22]/80 backdrop-blur-lg border border-[#30363D]/50;
+  }
+
+  .card {
+    @apply bg-[#161B22] border border-[#30363D] rounded-lg p-4;
+  }
+
+  .btn-primary {
+    @apply bg-[#238636] hover:bg-[#2EA043] text-white px-4 py-2 rounded-md font-medium transition-all duration-200;
+  }
+
+  .btn-danger {
+    @apply bg-[#F85149] hover:bg-[#DA3633] text-white px-4 py-2 rounded-md font-medium transition-all duration-200;
+  }
+
+  .btn-success {
+    @apply bg-[#3FB950] hover:bg-[#2EA043] text-white px-4 py-2 rounded-md font-medium transition-all duration-200;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-[#21262D] text-[#8B949E] hover:text-white px-3 py-2 rounded-md transition-all duration-200;
+  }
+
+  .btn-outline {
+    @apply bg-transparent border border-[#30363D] text-[#C9D1D9] hover:bg-[#21262D] hover:text-white px-4 py-2 rounded-md font-medium transition-all duration-200;
+  }
+
+  .input {
+    @apply bg-[#0D1117] border border-[#30363D] rounded-md px-3 py-2 text-[#C9D1D9] placeholder:text-[#8B949E] focus:outline-none focus:border-[#238636] focus:ring-1 focus:ring-[#238636] transition-colors;
+  }
+
+  .label {
+    @apply text-sm font-medium text-[#8B949E] mb-1.5 block;
+  }
+
+  .badge {
+    @apply px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply bg-[#238636]/20 text-[#3FB950];
+  }
+
+  .badge-danger {
+    @apply bg-[#F85149]/20 text-[#F85149];
+  }
+
+  .badge-warning {
+    @apply bg-[#F0883E]/20 text-[#F0883E];
+  }
+
+  .badge-primary {
+    @apply bg-[#388BFD]/20 text-[#58A6FF];
+  }
+
+  .badge-default {
+    @apply bg-[#21262D] text-[#8B949E];
+  }
+
+  .table-row {
+    @apply border-b border-[#21262D] hover:bg-[#161B22]/50 transition-colors;
+  }
+
+  .profit {
+    @apply text-[#3FB950];
+  }
+
+  .loss {
+    @apply text-[#F85149];
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#238636] to-[#3FB950];
+  }
+
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  @keyframes glow {
+    from {
+      box-shadow: 0 0 5px rgba(35, 134, 54, 0.2);
+    }
+    to {
+      box-shadow: 0 0 20px rgba(35, 134, 54, 0.4);
+    }
+  }
+
+  .sparkline {
+    background: linear-gradient(to top, rgba(63, 185, 80, 0.3), transparent);
+  }
+
+  .sparkline-down {
+    background: linear-gradient(to top, rgba(248, 81, 73, 0.3), transparent);
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}

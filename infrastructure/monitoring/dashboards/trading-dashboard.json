@@ -1,0 +1,143 @@
+{
+  "dashboard": {
+    "title": "Trading Platform - Executive Dashboard",
+    "tags": ["trading", "production"],
+    "timezone": "Asia/Kolkata",
+    "refresh": "5s",
+    "panels": [
+      {
+        "title": "Orders Placed (Last 1h)",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(trading_orders_placed_total[1h]))",
+            "legendFormat": "Orders"
+          }
+        ]
+      },
+      {
+        "title": "Trades Executed (Last 1h)",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(increase(trading_trades_executed_total[1h]))",
+            "legendFormat": "Trades"
+          }
+        ]
+      },
+      {
+        "title": "Daily P&L (INR)",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "trading_daily_pnl{mode=\"paper\"}",
+            "legendFormat": "{{user_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Open Positions",
+        "type": "stat",
+        "gridPos": {"x": 18, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(trading_positions_open{mode=\"paper\"})",
+            "legendFormat": "Open"
+          }
+        ]
+      },
+      {
+        "title": "Tick Processing Latency",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(trading_tick_processing_latency_ms_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(trading_tick_processing_latency_ms_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ]
+      },
+      {
+        "title": "Order Placement Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(trading_orders_latency_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(trading_orders_latency_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(trading_orders_latency_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ]
+      },
+      {
+        "title": "WebSocket Connections",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "trading_ws_connections",
+            "legendFormat": "Connections"
+          }
+        ]
+      },
+      {
+        "title": "WebSocket Latency",
+        "type": "graph",
+        "gridPos": {"x": 12, "y": 12, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(trading_ws_latency_ms_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ]
+      },
+      {
+        "title": "Kafka Consumer Lag",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 20, "w": 12, "h": 8},
+        "targets": [
+          {
+            "expr": "trading_kafka_consumer_lag",
+            "legendFormat": "{{topic}} [{{partition}}]"
+          }
+        ]
+      },
+      {
+        "title": "Margin Utilization",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 20, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "trading_margin_utilization_percent",
+            "legendFormat": "{{user_id}}"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"x": 18, "y": 20, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(trading_errors_total[5m])) by (component)",
+            "legendFormat": "{{component}}"
+          }
+        ]
+      }
+    ]
+  }
+}

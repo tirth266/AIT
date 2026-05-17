@@ -1,0 +1,272 @@
+# =============================================================================
+# KAFKA EVENT STREAMING INFRASTRUCTURE
+# =============================================================================
+# Production-ready Kafka cluster with Schema Registry, Connect, and KSQL
+# Includes: Zookeeper, Kafka, Schema Registry, Kafka Connect, Kafka UI
+#
+# Usage:
+#   docker-compose -f docker-compose.kafka.yml up -d
+#   docker-compose -f docker-compose.kafka.yml down
+
+version: '3.8'
+
+services:
+  # =============================================================================
+  # ZOOKEEPER - Kafka Metadata
+  # =============================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: trading-zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 2
+    volumes:
+      - zookeeper_data:/var/lib/zookeeper/data
+      - zookeeper_logs:/var/lib/zookeeper/log
+    networks:
+      - kafka-network
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # KAFKA BROKERS - Event Streaming
+  # =============================================================================
+  kafka-1:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-1
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+      KAFKA_NUM_PARTITIONS: 16
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 1000
+      KAFKA_CONNECTIONS_MAX_IDLE_MS: 600000
+      KAFKA_METRICS_REPORTERS: io.confluent.metrics.reporter.ConfluentMetricsReporter
+      KAFKA_CONFluent_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      KAFKA_JMX_PORT: 9991
+      KAFKA_JMX_HOSTNAME: localhost
+    volumes:
+      - kafka1_data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-2:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-2
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9093:9092"
+      - "29093:29092"
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:29092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+      KAFKA_NUM_PARTITIONS: 16
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_JMX_PORT: 9991
+      KAFKA_JMX_HOSTNAME: localhost
+    volumes:
+      - kafka2_data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-3:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: trading-kafka-3
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9094:9092"
+      - "29094:29092"
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:29092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 3
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 2
+      KAFKA_LOG_RETENTION_HOURS: 168
+      KAFKA_LOG_RETENTION_BYTES: 10737418240
+      KAFKA_NUM_PARTITIONS: 16
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_JMX_PORT: 9991
+      KAFKA_JMX_HOSTNAME: localhost
+    volumes:
+      - kafka3_data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  # =============================================================================
+  # SCHEMA REGISTRY - Schema Management
+  # =============================================================================
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.5.0
+    container_name: trading-schema-registry
+    restart: unless-stopped
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8081:8081"
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LOG4J_LOG_ROOT: WARN
+      SCHEMA_REGISTRY_CONFLUENT_SCHEMA_REGISTRY_AUTH_MODE: none
+    networks:
+      - kafka-network
+
+  # =============================================================================
+  # KAFKA REST PROXY - REST API Access
+  # =============================================================================
+  kafka-rest:
+    image: confluentinc/cp-kafka-rest:7.5.0
+    container_name: trading-kafka-rest
+    restart: unless-stopped
+    depends_on:
+      - schema-registry
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8082:8082"
+    environment:
+      KAFKA_REST_HOST_NAME: kafka-rest
+      KAFKA_REST_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      KAFKA_REST_LISTENERS: http://0.0.0.0:8082
+      KAFKA_REST_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+    networks:
+      - kafka-network
+
+  # =============================================================================
+  # KAFKA CONNECT - Data Integration
+  # =============================================================================
+  kafka-connect:
+    image: confluentinc/cp-kafka-connect:7.5.0
+    container_name: trading-kafka-connect
+    restart: unless-stopped
+    depends_on:
+      - schema-registry
+      - kafka-1
+      - kafka-2
+      - kafka-3
+    ports:
+      - "8083:8083"
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      CONNECT_GROUP_ID: trading-connect-cluster
+      CONNECT_CONFIG_STORAGE_TOPIC: connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: connect-status
+      CONNECT_KEY_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_VALUE_CONVERTER: io.confluent.connect.avro.AvroConverter
+      CONNECT_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_OFFSET_FLUSH_INTERVAL_MS: 10000
+      CONNECT_OFFSET_FLUSH_TIMEOUT_MS: 10000
+      CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 3
+      CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 3
+    volumes:
+      - kafka_connect_data:/var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  # =============================================================================
+  # KAFKA UI - Monitoring and Management
+  # =============================================================================
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: trading-kafka-ui
+    restart: unless-stopped
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+    ports:
+      - "8085:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: trading-cluster
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://schema-registry:8081
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: trading-connect
+      KAFKA_CLUSTERS_0_KAFKACONNECT_0_URL: http://kafka-connect:8083
+    networks:
+      - kafka-network
+
+  # =============================================================================
+  # KSQL-DB - Stream Processing
+  # =============================================================================
+  ksqldb:
+    image: confluentinc/cp-ksqldb-server:7.5.0
+    container_name: trading-ksqldb
+    restart: unless-stopped
+    depends_on:
+      - kafka-1
+      - kafka-2
+      - kafka-3
+      - schema-registry
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_BOOTSTRAP_SERVERS: kafka-1:29092,kafka-2:29092,kafka-3:29092
+      KSQL_LISTENERS: http://0.0.0.0:8088
+      KSQL_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      KSQL_KSQL_SERVICE_ID: trading_ksql
+      KSQL_PRODUCER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringProducerInterceptor
+      KSQL_CONSUMER_INTERCEPTOR_CLASSES: io.confluent.monitoring.clients.interceptor.MonitoringConsumerInterceptor
+    networks:
+      - kafka-network
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  kafka-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  zookeeper_data:
+  zookeeper_logs:
+  kafka1_data:
+  kafka2_data:
+  kafka3_data:
+  kafka_connect_data:

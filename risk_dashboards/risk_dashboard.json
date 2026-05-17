@@ -1,0 +1,191 @@
+{
+  "dashboard": {
+    "title": "Institutional Risk Dashboard",
+    "uid": "institutional-risk",
+    "tags": ["risk", "trading", "institutional"],
+    "timezone": "browser",
+    "refresh": "5s",
+    "panels": [
+      {
+        "title": "Portfolio VaR Overview",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_portfolio_var_95)", "legendFormat": "VaR 95%"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 5000, "color": "yellow"},
+                {"value": 10000, "color": "red"}
+              ]
+            },
+            "unit": "currency"
+          }
+        }
+      },
+      {
+        "title": "Expected Shortfall (CVaR)",
+        "type": "stat",
+        "gridPos": {"x": 4, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_expected_shortfall)", "legendFormat": "ES 95%"}
+        ]
+      },
+      {
+        "title": "Margin Utilization",
+        "type": "gauge",
+        "gridPos": {"x": 8, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "avg(trading_margin_utilization)", "legendFormat": "Utilization %"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 100,
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 60, "color": "yellow"},
+                {"value": 80, "color": "red"}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "title": "Risk Level Distribution",
+        "type": "piechart",
+        "gridPos": {"x": 12, "y": 0, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "count by (risk_level) (trading_risk_level)", "legendFormat": "{{risk_level}}"}
+        ]
+      },
+      {
+        "title": "VaR Time Series (95% & 99%)",
+        "type": "timeseries",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {"expr": "trading_portfolio_var_95", "legendFormat": "VaR 95%"},
+          {"expr": "trading_portfolio_var_99", "legendFormat": "VaR 99%"},
+          {"expr": "trading_expected_shortfall", "legendFormat": "ES 95%"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "currency",
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        }
+      },
+      {
+        "title": "Stress Test Results",
+        "type": "bargauge",
+        "gridPos": {"x": 12, "y": 4, "w": 12, "h": 8},
+        "targets": [
+          {"expr": "trading_stress_test_loss_percent", "legendFormat": "{{scenario}}"}
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 50,
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 10, "color": "yellow"},
+                {"value": 20, "color": "red"}
+              ]
+            },
+            "unit": "percent"
+          }
+        }
+      },
+      {
+        "title": "Sector Exposure Heatmap",
+        "type": "heatmap",
+        "gridPos": {"x": 0, "y": 12, "w": 8, "h": 8},
+        "targets": [
+          {"expr": "sum by (sector) (trading_sector_exposure)", "legendFormat": "{{sector}}"}
+        ]
+      },
+      {
+        "title": "Position Concentration",
+        "type": "bargauge",
+        "gridPos": {"x": 8, "y": 12, "w": 8, "h": 8},
+        "targets": [
+          {"expr": "topk(10, trading_position_exposure)", "legendFormat": "{{symbol}}"}
+        ]
+      },
+      {
+        "title": "Greeks Overview",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 20, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_greeks_delta)", "legendFormat": "Delta"}
+        ]
+      },
+      {
+        "title": "Gamma Exposure",
+        "type": "stat",
+        "gridPos": {"x": 4, "y": 20, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_greeks_gamma)", "legendFormat": "Gamma"}
+        ]
+      },
+      {
+        "title": "Theta Decay",
+        "type": "stat",
+        "gridPos": {"x": 8, "y": 20, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_greeks_theta)", "legendFormat": "Theta (daily)"}
+        ]
+      },
+      {
+        "title": "Vega Exposure",
+        "type": "stat",
+        "gridPos": {"x": 12, "y": 20, "w": 4, "h": 4},
+        "targets": [
+          {"expr": "sum(trading_greeks_vega)", "legendFormat": "Vega"}
+        ]
+      },
+      {
+        "title": "Active Alerts",
+        "type": "table",
+        "gridPos": {"x": 0, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {"expr": "trading_risk_alerts{severity=~\"critical|warning\"}", "legendFormat": "{{alert_type}}"}
+        ],
+        "transform": "table"
+      },
+      {
+        "title": "Circuit Breaker Status",
+        "type": "table",
+        "gridPos": {"x": 12, "y": 24, "w": 12, "h": 8},
+        "targets": [
+          {"expr": "trading_circuit_breaker_status", "legendFormat": "{{breaker_type}}"}
+        ]
+      }
+    ],
+    "templating": {
+      "list": [
+        {
+          "name": "user",
+          "type": "query",
+          "query": "label_values(trading_portfolio_var_95, user_id)",
+          "multi": true
+        },
+        {
+          "name": "timeRange",
+          "type": "interval",
+          "options": ["5m", "15m", "1h", "6h", "24h"]
+        }
+      ]
+    }
+  }
+}
