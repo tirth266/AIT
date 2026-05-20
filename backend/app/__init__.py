@@ -86,7 +86,7 @@ def initialize_background_services(app: Flask) -> None:
         
         def run_angel_ws():
             try:
-                from app.brokers.angelone.websocket.manager import ws_manager as angel_ws
+                from .brokers.angelone.websocket.manager import ws_manager as angel_ws
                 angel_ws.start()
             except Exception as e:
                 app.logger.warning(f"Angel One WS initialization: {e}")

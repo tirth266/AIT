@@ -12,12 +12,15 @@ import os
 import sys
 import logging
 
+# Add current directory to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 # ── 1. Load .env BEFORE importing the app ──────────────────────────────────────
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 # ── 2. Server configuration ───────────────────────────────────────────────────
-PORT = int(os.environ.get('PORT', 5000))
+port = int(os.environ.get('PORT', 10000))
 DEBUG = os.environ.get('FLASK_DEBUG', '0') == '1'
 
 # ── 3. Setup logging ──────────────────────────────────────────────────────────
@@ -34,19 +37,12 @@ from app import app, socketio
 
 print("\n!!! RUN.PY EXECUTING - VERSION 1.0.2 !!!\n")
 
-if __name__ == '__main__':
-    print(f"\n{'='*60}")
-    print(f"  AIT Trading Platform - Backend")
-    print(f"  http://localhost:{PORT}  (API + WebSocket)")
-    print(f"  Mode : {'DEBUG' if DEBUG else 'PRODUCTION'}")
-    print(f"{'='*60}\n")
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
 
     socketio.run(
         app,
-        host='0.0.0.0',
-        port=PORT,
-        debug=DEBUG,
-        use_reloader=False,
-        log_output=True,
-        allow_unsafe_werkzeug=True
+        host="0.0.0.0",
+        port=port,
+        debug=False
     )

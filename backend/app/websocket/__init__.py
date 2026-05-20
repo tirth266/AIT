@@ -4,15 +4,11 @@ WebSocket Module
 WebSocket handling for realtime trading.
 """
 
-import os
-
-frontend_origin = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
-
-from app.websocket.handlers import register_handlers
+from .handlers import register_handlers
 
 # emit helpers live in market_events.py, not events.py
 try:
-    from app.websocket.market_events import (
+    from .market_events import (
         emit_price,
         emit_trade,
         emit_signal,
