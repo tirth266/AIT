@@ -7,20 +7,21 @@ ENV PYTHONUNBUFFERED=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
     curl \
-    libffi8 \
-    libssl3 \
     tzdata \
     git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 
-RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip setuptools wheel
+
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
 EXPOSE 10000
 
-CMD ["gunicorn", "-k", "eventlet", "-w", "1", "-b", "0.0.0.0:10000", "run:app"]
+CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:10000", "run:app"]

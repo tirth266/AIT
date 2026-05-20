@@ -11,29 +11,28 @@ import sys
 from flask import Flask, jsonify, request, g
 from flask_socketio import SocketIO
 
-from app.config import config
-from app.extensions import init_extensions
-from app.logs import setup_logging, init_correlation_middleware
-from app.errors.handlers import register_error_handlers
-from app.middleware import register_middleware
-from app.observability import (
+from .config import config
+from .extensions import init_extensions
+from .logs import setup_logging, init_correlation_middleware
+from .errors.handlers import register_error_handlers
+from .middleware import register_middleware
+from .observability import (
     setup_metrics,
     setup_tracing,
     setup_health_checks,
     metrics_collector
 )
-from app.trading_engine.execution_engine import get_execution_engine
-from app.trading_engine.paper.paper_exchange import get_paper_exchange
-from app.websocket.redis_manager import get_redis_pool
-from app.websocket.socket_manager import init_websocket_manager
+from .trading_engine.execution_engine import get_execution_engine
+from .trading_engine.paper.paper_exchange import get_paper_exchange
+from .websocket.redis_manager import get_redis_pool
+from .websocket.socket_manager import init_websocket_manager
 
 def get_frontend_origins():
     raw_origins = os.environ.get('FRONTEND_URL', '')
     origins = [origin.strip() for origin in raw_origins.split(',') if origin.strip()]
     if not origins:
-        raise RuntimeError(
-            'FRONTEND_URL is not set. Set FRONTEND_URL to your frontend deployment URL(s) in production.'
-        )
+        # Default for local development
+        origins = ['http://localhost:5173', 'http://127.0.0.1:5173']
     return origins
 
 
@@ -98,7 +97,7 @@ def initialize_background_services(app: Flask) -> None:
         exchange_thread.start()
         
         try:
-            from app.brokers.angelone.websocket.manager import ws_manager as angel_ws
+            from .brokers.angelone.websocket.manager import ws_manager as angel_ws
             angel_ws.start()
         except Exception as e:
             app.logger.warning(f"Angel One WS: {e}")
@@ -126,40 +125,21 @@ def create_app(config_name: str = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
-    @app.route("/")
-    def home():
-        """Root endpoint - service status."""
-        return {
-            "status": "online",
-            "service": "AIT Trading Platform Backend",
-            "websocket": "enabled",
-            "environment": config_name
-        }, 200
-
-    @app.route("/ping")
-    def simple_ping():
-        """Simple top-level ping endpoint."""
-        return jsonify({"status": "pong"}), 200
-
-    @app.route("/api/health")
-    def api_health():
-        """API health check endpoint."""
-        return {"status": "healthy"}, 200
-
     setup_logging(app)
     init_correlation_middleware(app)
     logger = logging.getLogger('trading_app')
     logger.info(f"Starting application in {config_name} mode")
 
-    init_extensions(app)
+    # Temporarily disabled extensions/services to debug Bad Gateway
+    # init_extensions(app)
     register_blueprints(app)
     register_socket_events(app)
     register_error_handlers(app)
     register_middleware(app)
 
-    setup_metrics(app)
-    setup_tracing(app)
-    setup_health_checks(app)
+    # setup_metrics(app)
+    # setup_tracing(app)
+    # setup_health_checks(app)
 
     @app.errorhandler(Exception)
     def handle_exception(e):
@@ -167,11 +147,9 @@ def create_app(config_name: str = None) -> Flask:
         import traceback
         error_msg = f"Unhandled Exception: {str(e)}\n{traceback.format_exc()}"
         app.logger.error(error_msg)
-        print(error_msg) # Direct to console for visibility
         return jsonify({
             "error": "INTERNAL_ERROR",
-            "message": str(e),
-            "traceback": traceback.format_exc().splitlines()
+            "message": str(e)
         }), 500
 
     @app.after_request
@@ -186,31 +164,9 @@ def create_app(config_name: str = None) -> Flask:
             
         return response
 
-    @app.route("/api/v1/ping")
-    def ping():
-        """Direct, stable diagnostic endpoint."""
-        return jsonify({
-            "status": "pong",
-            "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
-            "version": "1.0.4-stable"
-        }), 200
-
-    @app.route("/api/v1/debug/routes")
-    def list_routes():
-        """Expose URL map for verification."""
-        routes = []
-        for rule in app.url_map.iter_rules():
-            routes.append({
-                "endpoint": rule.endpoint,
-                "methods": list(rule.methods),
-                "rule": str(rule)
-            })
-        return jsonify({"routes": sorted(routes, key=lambda x: x['rule'])})
-
     # Initialize background services safely after app creation
-    initialize_background_services(app)
-
-    logger.info("Observability stack initialized (metrics, tracing, health checks)")
+    # Temporarily disabled
+    # initialize_background_services(app)
 
     logger.info("Application initialized successfully")
     return app
@@ -218,17 +174,16 @@ def create_app(config_name: str = None) -> Flask:
 
 def register_blueprints(app: Flask) -> None:
     """Register all API blueprints."""
-    # Register most specific or critical blueprints first
-    from app.brokers.angelone import angelone_bp
+    from .brokers.angelone import angelone_bp
     app.register_blueprint(angelone_bp, url_prefix='/api/v1/broker/angelone')
 
-    from app.api import (
+    from .api import (
         strategies, trades, orders, watchlist,
         ai_signals, notifications, funds, bot, broker,
         backtest, market, settings, dashboard, health, auth
     )
-    from app.api.trading_engine import bp as trading_engine_bp
-    from app.api.strategy_engine import bp as strategy_engine_bp
+    from .api.trading_engine import bp as trading_engine_bp
+    from .api.strategy_engine import bp as strategy_engine_bp
 
     # API v1 Core Blueprints
     app.register_blueprint(auth.bp, url_prefix='/api/v1/auth')
@@ -245,13 +200,9 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(market.bp, url_prefix='/api/v1/market')
     app.register_blueprint(settings.bp, url_prefix='/api/v1/settings')
     app.register_blueprint(dashboard.bp, url_prefix='/api/v1/dashboard')
-    
-    # Register health with a more specific prefix to avoid shadowing /api/v1
     app.register_blueprint(health.bp, url_prefix='/api/v1/health')
-    
     app.register_blueprint(trading_engine_bp, url_prefix='/api/v1/trading')
     app.register_blueprint(strategy_engine_bp, url_prefix='/api/v1/strategy')
-
 
 
 def register_socket_events(app: Flask) -> None:
@@ -259,12 +210,13 @@ def register_socket_events(app: Flask) -> None:
     app_ws_logger = logging.getLogger('websocket')
     app_ws_logger.info("Initializing WebSocket...")
 
-    redis_pool = get_redis_pool()
-    try:
-        redis_pool.initialize()
-        app_ws_logger.info(f"Redis connected: {redis_pool.redis_url}")
-    except Exception as e:
-        app_ws_logger.warning(f"Redis unavailable: {e}, using local mode")
+    # Temporarily disabled Redis message queue
+    # redis_pool = get_redis_pool()
+    # try:
+    #     redis_pool.initialize()
+    #     app_ws_logger.info(f"Redis connected: {redis_pool.redis_url}")
+    # except Exception as e:
+    #     app_ws_logger.warning(f"Redis unavailable: {e}, using local mode")
 
     socketio.init_app(
         app,
@@ -275,8 +227,8 @@ def register_socket_events(app: Flask) -> None:
 
 def initialize_market_data_engine():
     """Initialize the market data engine."""
-    from app.market_data.engine import initialize_market_engine, get_market_data_engine
-    from app.websocket.socket_manager import get_ws_manager
+    from .market_data.engine import initialize_market_engine, get_market_data_engine
+    from .websocket.socket_manager import get_ws_manager
 
     engine = initialize_market_engine()
 
@@ -290,7 +242,3 @@ def initialize_market_data_engine():
     engine.set_broadcast_callback(broadcast_callback)
     logging.getLogger('trading_app').info("Market data engine initialized")
     return get_market_data_engine()
-
-
-# Create the application instance for use by run.py and other entry points
-app = create_app()
