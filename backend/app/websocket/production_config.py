@@ -18,9 +18,16 @@ class ProductionSocketConfig:
     def get_config() -> Dict[str, Any]:
         """Get production configuration."""
 
+        frontend_url = os.getenv('FRONTEND_URL', '')
+        cors_allowed_origins = [origin.strip() for origin in frontend_url.split(',') if origin.strip()]
+        if not cors_allowed_origins:
+            raise RuntimeError(
+                'FRONTEND_URL is not set. Set FRONTEND_URL to your frontend deployment URL(s) in production.'
+            )
+
         return {
             'async_mode': os.environ.get('SOCKET_ASYNC_MODE', 'eventlet'),
-            'cors_allowed_origins': os.environ.get('FRONTEND_URL', 'http://localhost:5173'),
+            'cors_allowed_origins': cors_allowed_origins,
             'ping_timeout': 60,
             'ping_interval': 25,
             'max_http_buffer_size': 10000000,

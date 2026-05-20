@@ -1,10 +1,14 @@
+import eventlet
+eventlet.monkey_patch()
+
 import os
 import sys
 import logging
 from dotenv import load_dotenv
 
-# Add current directory to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add current directory and its parent to path to handle various import styles
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
 # Load environment variables
 load_dotenv()
@@ -14,16 +18,17 @@ from app import create_app, socketio
 app = create_app()
 
 @app.route("/")
-def home():
+def health_check_root():
     return {
         "status": "running",
-        "service": "AIT Trading Platform"
+        "service": "AIT Trading Platform",
+        "environment": os.environ.get("FLASK_ENV", "production")
     }
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
     
-    print("Starting Flask application...")
+    print("Starting Flask application via socketio.run...")
     print(f"PORT: {port}")
     print(f"ENV: {os.environ.get('FLASK_ENV', 'production')}")
 

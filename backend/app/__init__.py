@@ -125,6 +125,20 @@ def create_app(config_name: str = None) -> Flask:
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
+    @app.route("/api/v1/ping")
+    def ping():
+        """Direct, stable diagnostic endpoint."""
+        return jsonify({
+            "status": "pong",
+            "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
+            "version": "1.0.4-stable"
+        }), 200
+
+    @app.route("/api/health")
+    def api_health():
+        """API health check endpoint."""
+        return {"status": "healthy"}, 200
+
     setup_logging(app)
     init_correlation_middleware(app)
     logger = logging.getLogger('trading_app')

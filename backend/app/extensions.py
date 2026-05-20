@@ -14,8 +14,8 @@ from flask_limiter.util import get_remote_address
 from pymongo import MongoClient
 import redis
 
-from app.celery_app import celery_app
-from app.services.redis_service import get_redis_service
+from .celery_app import celery_app
+from .services.redis_service import get_redis_service
 
 logger = logging.getLogger('trading_app')
 
@@ -69,7 +69,7 @@ def init_mongodb(app: Flask) -> None:
 
         app.mongo_db = mongo_db
 
-        from app.database import connection
+        from .database import connection
         connection._mongo_client = mongo_client
         connection._mongo_db = mongo_db
 

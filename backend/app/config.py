@@ -41,7 +41,13 @@ def build_mongo_uri() -> str:
 class Config:
     """Base configuration with common settings."""
 
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+    SECRET_KEY = os.getenv("SECRET_KEY")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+
+    ANGEL_API_KEY = os.getenv("ANGEL_API_KEY")
+    ANGEL_CLIENT_ID = os.getenv("ANGEL_CLIENT_ID")
+    ANGEL_PIN = os.getenv("ANGEL_PIN")
+    ANGEL_TOTP_SECRET = os.getenv("ANGEL_TOTP_SECRET")
 
     # Secure MongoDB configuration
     MONGO_URI = build_mongo_uri()
@@ -126,7 +132,7 @@ class Config:
     ENABLE_LIVE_TRADING = os.environ.get('ENABLE_LIVE_TRADING', 'false').lower() == 'true'
     ENABLE_PAPER_TRADING = os.environ.get('ENABLE_PAPER_TRADING', 'true').lower() == 'true'
 
-    # Angel One Integration
+    # Angel One Integration (Legacy support)
     ANGELONE_CLIENT_ID = os.environ.get('ANGELONE_CLIENT_ID', '')
     ANGELONE_API_KEY = os.environ.get('ANGELONE_API_KEY', '')
     ANGELONE_SECRET_KEY = os.environ.get('ANGELONE_SECRET_KEY', '')

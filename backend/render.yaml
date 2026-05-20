@@ -1,6 +1,6 @@
 services:
   - type: web
     name: ait-backend
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python run.py
+    env: docker
+    dockerfilePath: Dockerfile
+    startCommand: gunicorn -k eventlet -b 0.0.0.0:$PORT run:app
