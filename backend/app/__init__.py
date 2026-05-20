@@ -28,16 +28,12 @@ from app.websocket.redis_manager import get_redis_pool
 from app.websocket.socket_manager import init_websocket_manager
 
 def get_frontend_origins():
-    raw_origins = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
+    raw_origins = os.environ.get('FRONTEND_URL', '')
     origins = [origin.strip() for origin in raw_origins.split(',') if origin.strip()]
-    default_origins = [
-        'http://localhost:5173',
-        'http://127.0.0.1:5173',
-        'https://YOUR_VERCEL_DOMAIN.vercel.app'
-    ]
-    for origin in default_origins:
-        if origin not in origins:
-            origins.append(origin)
+    if not origins:
+        raise RuntimeError(
+            'FRONTEND_URL is not set. Set FRONTEND_URL to your frontend deployment URL(s) in production.'
+        )
     return origins
 
 
@@ -46,8 +42,10 @@ def create_socketio():
     logger = logging.getLogger('socketio')
     logger.setLevel(logging.INFO)
 
+    cors_allowed_origins = get_frontend_origins()
+
     return SocketIO(
-        cors_allowed_origins=get_frontend_origins(),
+        cors_allowed_origins=cors_allowed_origins,
         async_mode=os.environ.get('SOCKET_ASYNC_MODE', 'eventlet'),
         ping_timeout=60,
         ping_interval=25,
@@ -138,6 +136,11 @@ def create_app(config_name: str = None) -> Flask:
             "environment": config_name
         }, 200
 
+    @app.route("/ping")
+    def simple_ping():
+        """Simple top-level ping endpoint."""
+        return jsonify({"status": "pong"}), 200
+
     @app.route("/api/health")
     def api_health():
         """API health check endpoint."""
@@ -175,17 +178,6 @@ def create_app(config_name: str = None) -> Flask:
     def final_response_processing(response):
         """Final global response processing to ensure headers and stability."""
         from flask import request, g
-        
-        # Force CSP for fonts and other assets
-        response.headers['Content-Security-Policy'] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
-            "img-src 'self' data: https:; "
-            "font-src 'self' data: https:; "
-            "connect-src 'self' wss: https:; "
-            "frame-ancestors 'none';"
-        )
         
         # Ensure Correlation ID is propagated safely
         corr_id = getattr(g, 'correlation_id', None) or getattr(request, 'correlation_id', None)
