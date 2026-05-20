@@ -7,7 +7,6 @@ Dashboard data and analytics endpoints.
 import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 
@@ -17,7 +16,6 @@ bp = Blueprint('dashboard', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def get_dashboard():
     """
     Get dashboard data.
@@ -87,7 +85,6 @@ def get_dashboard():
 
 
 @bp.route('/performance', methods=['GET'])
-@jwt_required()
 def get_performance():
     """
     Get performance metrics.
@@ -157,7 +154,6 @@ def get_performance():
 
 
 @bp.route('/equity-curve', methods=['GET'])
-@jwt_required()
 def get_equity_curve():
     """
     Get equity curve data.
@@ -209,7 +205,6 @@ def get_equity_curve():
 
 
 @bp.route('/recent-trades', methods=['GET'])
-@jwt_required()
 def get_recent_trades():
     """
     Get recent trades for dashboard.
@@ -235,7 +230,6 @@ def get_recent_trades():
 
 
 @bp.route('/positions', methods=['GET'])
-@jwt_required()
 def get_positions():
     """
     Get open positions for dashboard.

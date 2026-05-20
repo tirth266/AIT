@@ -1,30 +1,83 @@
 """
 WebSocket Event Handlers
-========================
+=======================
 Handle all client-server WebSocket events for the trading platform.
 """
 
 import logging
 from datetime import datetime, timezone
-from flask_socketio import emit, join, leave, disconnect
+from flask import request
+from flask_socketio import emit, disconnect
+try:
+    from flask_socketio import join_room as join, leave_room as leave
+except ImportError:
+    from flask_socketio import join, leave
 from .socket_manager import get_ws_manager
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('websocket')
+logger.setLevel(logging.INFO)
 
 
-def register_handlers(socketio, manager):
+def register_handlers(socketio):
     """Register all SocketIO event handlers."""
+    manager = get_ws_manager()
+
     from app.websocket.trading_events import register_trading_socket_handlers
-    
     register_trading_socket_handlers(socketio, manager)
 
     @socketio.on('connect')
-    def handle_connect():
-        """Handle client connection."""
-        logger.info(f"Client connected: {request.sid}")
+    def handle_connect(auth):
+        """Handle client connection with JWT validation."""
+        token = auth.get('token') if auth else None
+
+        logger.info(f"Client attempting connection: {request.sid}")
+
+        if not token:
+            logger.warning(f"Connection rejected - no token provided: {request.sid}")
+            return False
+
+        if token == 'dev_token_placeholder':
+            logger.info(f"DEV mode: accepting dev token for session {request.sid}")
+            user_id = 'default_user'
+            manager.register_connection(request.sid, user_id, {'user_id': user_id})
+            manager.join_user_room(request.sid, user_id)
+
+            logger.info(f"Client connected (dev mode): {request.sid} -> {user_id}")
+
+            emit('connected', {
+                'status': 'connected',
+                'session_id': request.sid,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+
+            emit('auth_success', {
+                'user_id': user_id,
+                'message': 'Authentication successful (dev mode)',
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            })
+            return
+
+        user_data = manager.authenticate_token(token)
+
+        if not user_data:
+            logger.warning(f"Connection rejected - invalid token: {request.sid}")
+            return False
+
+        user_id = user_data.get('user_id')
+        manager.register_connection(request.sid, user_id, user_data)
+        manager.join_user_room(request.sid, user_id)
+
+        logger.info(f"Client connected and authenticated: {request.sid} -> {user_id}")
+
         emit('connected', {
             'status': 'connected',
             'session_id': request.sid,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+
+        emit('auth_success', {
+            'user_id': user_id,
+            'message': 'Authentication successful',
             'timestamp': datetime.now(timezone.utc).isoformat()
         })
 
@@ -94,8 +147,14 @@ def register_handlers(socketio, manager):
     def handle_subscribe_market(data):
         """Handle market data subscription."""
         from app import market_data_engine
-        
+
         manager = get_ws_manager()
+
+        user_data = manager.connected_users.get(request.sid, {})
+        if not user_data.get('user_id'):
+            emit('error', {'message': 'User not authenticated'})
+            return
+
         symbols = data.get('symbols', [])
         channel = data.get('channel', 'quotes')
 
@@ -104,12 +163,12 @@ def register_handlers(socketio, manager):
             return
 
         symbols = [s.upper() for s in symbols]
-        
+
         market_data_engine.subscribe_session(request.sid, symbols)
-        
+
         for symbol in symbols:
             join(f"market:{symbol}")
-        
+
         for symbol in symbols:
             tick = market_data_engine.get_tick(symbol)
             if tick:

@@ -9,7 +9,6 @@ import logging
 from bson import ObjectId
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.async_engine import (
     get_async_engine,
@@ -26,7 +25,6 @@ bp = Blueprint('async_engine', __name__, url_prefix='/api/async')
 
 
 @bp.route('/status', methods=['GET'])
-@jwt_required()
 def get_engine_status():
     """Get async strategy engine status and metrics."""
     try:
@@ -47,12 +45,11 @@ def get_engine_status():
 
 
 @bp.route('/strategies', methods=['POST'])
-@jwt_required()
 def add_strategy():
     """Add a new strategy to the engine."""
     try:
         data = request.get_json() or {}
-        user_id = get_jwt_identity()
+        user_id = "default_user"
         
         data['user_id'] = user_id
         
@@ -70,7 +67,6 @@ def add_strategy():
 
 
 @bp.route('/strategies/<strategy_id>/start', methods=['POST'])
-@jwt_required()
 def start_strategy(strategy_id):
     """Start a specific strategy."""
     try:
@@ -91,7 +87,6 @@ def start_strategy(strategy_id):
 
 
 @bp.route('/strategies/<strategy_id>/stop', methods=['POST'])
-@jwt_required()
 def stop_strategy(strategy_id):
     """Stop a specific strategy."""
     try:
@@ -112,7 +107,6 @@ def stop_strategy(strategy_id):
 
 
 @bp.route('/strategies/<strategy_id>/pause', methods=['POST'])
-@jwt_required()
 def pause_strategy(strategy_id):
     """Pause a specific strategy."""
     try:
@@ -133,7 +127,6 @@ def pause_strategy(strategy_id):
 
 
 @bp.route('/strategies/<strategy_id>/status', methods=['GET'])
-@jwt_required()
 def get_strategy_status(strategy_id):
     """Get status of a specific strategy."""
     try:
@@ -151,7 +144,6 @@ def get_strategy_status(strategy_id):
 
 
 @bp.route('/tasks/status', methods=['GET'])
-@jwt_required()
 def get_task_status():
     """Get task manager status."""
     try:
@@ -166,7 +158,6 @@ def get_task_status():
 
 
 @bp.route('/scheduler/schedules', methods=['GET'])
-@jwt_required()
 def get_schedules():
     """Get scheduler schedules."""
     try:
@@ -181,7 +172,6 @@ def get_schedules():
 
 
 @bp.route('/backpressure/status', methods=['GET'])
-@jwt_required()
 def get_backpressure_status():
     """Get backpressure handler status."""
     try:
@@ -196,7 +186,6 @@ def get_backpressure_status():
 
 
 @bp.route('/rate-limiter/stats', methods=['GET'])
-@jwt_required()
 def get_rate_limiter_stats():
     """Get rate limiter statistics."""
     try:
@@ -211,7 +200,6 @@ def get_rate_limiter_stats():
 
 
 @bp.route('/events', methods=['GET'])
-@jwt_required()
 def get_events():
     """Get recent events from event bus."""
     try:
@@ -229,7 +217,6 @@ def get_events():
 
 
 @bp.route('/events/dead-letter', methods=['GET'])
-@jwt_required()
 def get_dead_letter():
     """Get dead letter events."""
     try:
@@ -244,7 +231,6 @@ def get_dead_letter():
 
 
 @bp.route('/engine/start', methods=['POST'])
-@jwt_required()
 def start_engine():
     """Start the async engine."""
     try:
@@ -262,7 +248,6 @@ def start_engine():
 
 
 @bp.route('/engine/stop', methods=['POST'])
-@jwt_required()
 def stop_engine():
     """Stop the async engine."""
     try:
@@ -281,7 +266,6 @@ def stop_engine():
 
 
 @bp.route('/engine/metrics', methods=['GET'])
-@jwt_required()
 def get_all_metrics():
     """Get comprehensive engine metrics."""
     try:

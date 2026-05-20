@@ -283,15 +283,20 @@ def run(db):
 
 if __name__ == '__main__':
     import os
+    import sys
     from dotenv import load_dotenv
     from pymongo import MongoClient
 
+    # Add backend directory to sys.path to import build_mongo_uri
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from app.config import build_mongo_uri
+
     load_dotenv()
 
-    mongo_uri = os.getenv('MONGO_URI', 'mongodb://localhost:27017/trading_db')
-    db_name = os.getenv('MONGO_DB_NAME', 'trading_db')
+    mongo_uri = build_mongo_uri()
+    db_name = os.getenv('MONGO_DB_NAME', 'trading_platform')
 
-    print(f"Connecting to: {mongo_uri.replace(os.getenv('MONGO_PASSWORD', 'password'), '****')}")
+    print(f"Connecting to MongoDB...")
 
     client = MongoClient(mongo_uri)
     db = client[db_name]

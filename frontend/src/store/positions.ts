@@ -1,12 +1,36 @@
 import { create } from 'zustand'
 import { positionsApi } from '../services/api'
 import type { Position, PositionSummary } from '../types'
+import { normalizePosition, normalizePositions, safeNumber } from '../utils/normalization'
+
+export const DEFAULT_POSITION_SUMMARY: PositionSummary = {
+  total_positions: 0,
+  total_value: 0,
+  total_pnl: 0,
+  day_pnl: 0,
+};
+
+export const DEFAULT_PAGINATION = {
+  page: 1,
+  limit: 50,
+  total: 0,
+  pages: 0,
+};
+
+export const normalizePositionSummary = (raw: any): PositionSummary => {
+  return {
+    total_positions: safeNumber(raw?.total_positions),
+    total_value: safeNumber(raw?.total_value),
+    total_pnl: safeNumber(raw?.total_pnl),
+    day_pnl: safeNumber(raw?.day_pnl),
+  };
+};
 
 interface PositionsState {
   positions: Position[]
   historyPositions: Position[]
   selectedPosition: Position | null
-  summary: PositionSummary | null
+  summary: PositionSummary
   isLoading: boolean
   isSubmitting: boolean
   error: string | null
@@ -32,20 +56,26 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
   positions: [],
   historyPositions: [],
   selectedPosition: null,
-  summary: null,
+  summary: DEFAULT_POSITION_SUMMARY,
   isLoading: false,
   isSubmitting: false,
   error: null,
-  pagination: { page: 1, limit: 50, total: 0, pages: 0 },
+  pagination: DEFAULT_PAGINATION,
 
   fetchPositions: async (params = {}) => {
     set({ isLoading: true, error: null })
     try {
       const response = await positionsApi.list(params)
+      const rawPagination = response.data.pagination;
       set({
-        positions: response.data.data,
-        summary: response.data.summary,
-        pagination: response.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+        positions: normalizePositions(response.data.data),
+        summary: normalizePositionSummary(response.data.summary) || DEFAULT_POSITION_SUMMARY,
+        pagination: {
+          page: safeNumber(rawPagination?.page, 1),
+          limit: safeNumber(rawPagination?.limit, 50),
+          total: safeNumber(rawPagination?.total, 0),
+          pages: safeNumber(rawPagination?.pages, 0),
+        } || DEFAULT_PAGINATION,
         isLoading: false,
       })
     } catch (error) {
@@ -59,8 +89,8 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
     try {
       const response = await positionsApi.open()
       set({
-        positions: response.data.data,
-        summary: response.data.summary,
+        positions: normalizePositions(response.data.data),
+        summary: normalizePositionSummary(response.data.summary) || DEFAULT_POSITION_SUMMARY,
         isLoading: false,
       })
     } catch (error) {
@@ -73,7 +103,7 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
     set({ isLoading: true })
     try {
       const response = await positionsApi.get(id)
-      set({ selectedPosition: response.data.data, isLoading: false })
+      set({ selectedPosition: normalizePosition(response.data.data), isLoading: false })
     } catch (error) {
       console.error('Failed to fetch position:', error)
       set({ error: 'Failed to fetch position details', isLoading: false })
@@ -84,9 +114,15 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
     set({ isLoading: true })
     try {
       const response = await positionsApi.history(params)
+      const rawPagination = response.data.pagination;
       set({
-        historyPositions: response.data.data,
-        pagination: response.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+        historyPositions: normalizePositions(response.data.data),
+        pagination: {
+          page: safeNumber(rawPagination?.page, 1),
+          limit: safeNumber(rawPagination?.limit, 50),
+          total: safeNumber(rawPagination?.total, 0),
+          pages: safeNumber(rawPagination?.pages, 0),
+        } || DEFAULT_PAGINATION,
         isLoading: false,
       })
     } catch (error) {
@@ -110,11 +146,12 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
   },
 
   updatePositionFromWS: (position) => {
+    const normalizedPosition = normalizePosition(position)
     set((state) => ({
       positions: state.positions.map((p) =>
-        p.position_id === position.position_id ? position : p
+        p.position_id === normalizedPosition.position_id ? normalizedPosition : p
       ),
-      selectedPosition: state.selectedPosition?.position_id === position.position_id ? position : state.selectedPosition,
+      selectedPosition: state.selectedPosition?.position_id === normalizedPosition.position_id ? normalizedPosition : state.selectedPosition,
     }))
   },
 
@@ -125,7 +162,7 @@ export const usePositionsStore = create<PositionsState>((set, get) => ({
     }))
   },
 
-  setSelectedPosition: (position) => set({ selectedPosition: position }),
+  setSelectedPosition: (position) => set({ selectedPosition: position ? normalizePosition(position) : null }),
 
   clearError: () => set({ error: null }),
 }))

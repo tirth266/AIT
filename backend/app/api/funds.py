@@ -8,7 +8,6 @@ import logging
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -18,7 +17,6 @@ bp = Blueprint('funds', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def get_funds():
     """
     Get user's funds and balance information.
@@ -26,7 +24,7 @@ def get_funds():
     Returns:
         Fund details with balance breakdown
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -64,7 +62,6 @@ def get_funds():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def add_funds():
     """
     Add funds to trading account.
@@ -81,7 +78,7 @@ def add_funds():
     Returns:
         Updated fund details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     amount = data.get('amount')
@@ -149,7 +146,6 @@ def add_funds():
 
 
 @bp.route('/withdraw', methods=['POST'])
-@jwt_required()
 def withdraw_funds():
     """
     Withdraw funds from trading account.
@@ -165,7 +161,7 @@ def withdraw_funds():
     Returns:
         Updated fund details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     amount = data.get('amount')
@@ -234,7 +230,6 @@ def withdraw_funds():
 
 
 @bp.route('/transactions', methods=['GET'])
-@jwt_required()
 def list_transactions():
     """
     List fund transactions.
@@ -250,7 +245,7 @@ def list_transactions():
     Returns:
         List of transactions
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     transaction_type = request.args.get('transaction_type')
     mode = request.args.get('mode')
     start_date = request.args.get('start_date')
@@ -291,7 +286,6 @@ def list_transactions():
 
 
 @bp.route('/reset', methods=['POST'])
-@jwt_required()
 def reset_funds():
     """
     Reset paper trading funds to initial balance.
@@ -304,7 +298,7 @@ def reset_funds():
     Returns:
         Reset fund details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     initial_amount = data.get('amount', 100000)
@@ -352,7 +346,6 @@ def reset_funds():
 
 
 @bp.route('/update-pnl', methods=['POST'])
-@jwt_required()
 def update_pnl():
     """
     Update PnL values (called by trading engine).
@@ -366,7 +359,7 @@ def update_pnl():
     Returns:
         Updated fund details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     db = get_db()
@@ -398,7 +391,6 @@ def update_pnl():
 
 
 @bp.route('/summary', methods=['GET'])
-@jwt_required()
 def get_funds_summary():
     """
     Get comprehensive funds summary.
@@ -406,7 +398,7 @@ def get_funds_summary():
     Returns:
         Fund summary with statistics
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:

@@ -7,7 +7,6 @@ Broker connection and management endpoints.
 import logging
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 from app.utils.encryption import encrypt_value, decrypt_value
@@ -19,7 +18,6 @@ bp = Blueprint('broker', __name__)
 
 
 @bp.route('/connect', methods=['POST'])
-@jwt_required()
 def connect_broker():
     """
     Connect a broker.
@@ -96,7 +94,6 @@ def connect_broker():
 
 
 @bp.route('/status', methods=['GET'])
-@jwt_required()
 def get_broker_status():
     """
     Get broker connection status.
@@ -120,7 +117,6 @@ def get_broker_status():
 
 
 @bp.route('/disconnect', methods=['DELETE'])
-@jwt_required()
 def disconnect_broker():
     """
     Disconnect a broker.
@@ -164,7 +160,6 @@ def disconnect_broker():
 
 
 @bp.route('/balance', methods=['GET'])
-@jwt_required()
 def get_balance():
     """
     Get account balance from broker.
@@ -217,7 +212,6 @@ def get_balance():
 
 
 @bp.route('/test', methods=['POST'])
-@jwt_required()
 def test_connection():
     """
     Test broker connection.

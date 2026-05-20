@@ -387,8 +387,14 @@ export interface Strategy {
 export interface StrategyParameters {
   indicator?: string
   rsi_period?: number
+  fast_period?: number
+  slow_period?: number
+  period?: number
   oversold?: number
   overbought?: number
+  lookback?: number
+  multiplier?: number
+  min_confidence?: number
   entry_condition?: string
   exit_condition?: string
   [key: string]: unknown
@@ -399,8 +405,12 @@ export interface RiskSettings {
   stop_loss_percent: number
   target_percent: number
   max_daily_loss: number
+  position_size_percent?: number
+  max_positions?: number
   trailing_stop_enabled?: boolean
   trailing_stop_percent?: number
+  min_risk_reward_ratio?: number
+  max_trades_per_day?: number
 }
 
 export interface StrategyStatistics {
@@ -690,30 +700,6 @@ export type StrategyType =
   | 'custom'
 
 export type StrategyStatus = 'created' | 'running' | 'paused' | 'stopped' | 'error'
-
-export interface StrategyParameters {
-  fast_period?: number
-  slow_period?: number
-  period?: number
-  oversold?: number
-  overbought?: number
-  lookback?: number
-  multiplier?: number
-  min_confidence?: number
-  [key: string]: unknown
-}
-
-export interface RiskSettings {
-  stop_loss_percent: number
-  target_percent: number
-  position_size_percent: number
-  max_positions: number
-  max_daily_loss: number
-  trailing_stop_enabled?: boolean
-  trailing_stop_percent?: number
-  min_risk_reward_ratio?: number
-  max_trades_per_day?: number
-}
 
 export interface ExecutionSettings {
   order_type: 'MARKET' | 'LIMIT' | 'SL' | 'SL-M'

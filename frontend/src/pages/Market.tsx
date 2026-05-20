@@ -19,7 +19,7 @@ export function MarketPage() {
   const { prices, watchlist, selectedSymbol, setSelectedSymbol, addToWatchlist, removeFromWatchlist } = useMarketStore()
   const [searchQuery, setSearchQuery] = useState('')
   const [timeframe, setTimeframe] = useState('1h')
-  const [candles, setCandles] = useState(generateCandleData(selectedSymbol))
+  const [candles, setCandles] = useState(generateCandleData(selectedSymbol || 'RELIANCE'))
 
   const displayPrices = Object.keys(prices).length > 0 ? prices : mockPrices
 
@@ -27,7 +27,7 @@ export function MarketPage() {
     p.symbol.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const selectedPrice = displayPrices[selectedSymbol]
+  const selectedPrice = selectedSymbol ? displayPrices[selectedSymbol] : undefined
 
   return (
     <div className="space-y-6">
@@ -65,7 +65,7 @@ export function MarketPage() {
                     key={tf}
                     onClick={() => {
                       setTimeframe(tf)
-                      setCandles(generateCandleData(selectedSymbol, 100))
+                      setCandles(generateCandleData(selectedSymbol || 'RELIANCE', 100))
                     }}
                     className={clsx(
                       'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',

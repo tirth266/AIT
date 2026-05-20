@@ -1,8 +1,9 @@
 """
 Redis Connection Manager
-=========================
+========================
 Manages Redis connections for horizontal scaling with connection pooling,
-pub/sub channels, and message queue integration.
+pubsub channels, and message queue integration.
+Provides graceful fallback if Redis is unavailable.
 """
 
 import os
@@ -54,34 +55,58 @@ class RedisConnectionPool:
         self._async_client: Optional[AsyncRedis] = None
         self._health_check_thread: Optional[threading.Thread] = None
         self._running = False
+        self._redis_available = False
+        self._init_error: Optional[str] = None
 
     def initialize(self):
-        """Initialize sync and async connection pools."""
-        self._sync_pool = redis.ConnectionPool.from_url(
-            self.redis_url,
-            max_connections=self.max_connections,
-            socket_timeout=self.socket_timeout,
-            socket_connect_timeout=self.socket_connect_timeout,
-            socket_keepalive=self.socket_keepalive,
-            retry_on_timeout=self.retry_on_timeout,
-            decode_responses=True
-        )
-        self._client = redis.Redis(connection_pool=self._sync_pool)
+        """Initialize sync and async connection pools with connection test."""
+        try:
+            self._sync_pool = redis.ConnectionPool.from_url(
+                self.redis_url,
+                max_connections=self.max_connections,
+                socket_timeout=self.socket_timeout,
+                socket_connect_timeout=self.socket_connect_timeout,
+                socket_keepalive=self.socket_keepalive,
+                retry_on_timeout=self.retry_on_timeout,
+                decode_responses=True
+            )
+            self._client = redis.Redis(connection_pool=self._sync_pool)
+            self._client.ping()
+            self._redis_available = True
+            logger.info(f"[OK] Redis connected: {self.redis_url}")
 
-        self._async_pool = AsyncConnectionPool.from_url(
-            self.redis_url.replace('/0', '/1'),
-            max_connections=self.max_connections // 2,
-            socket_timeout=self.socket_timeout,
-            socket_connect_timeout=self.socket_connect_timeout,
-            decode_responses=True
-        )
-        self._async_client = AsyncRedis(connection_pool=self._async_pool)
+            self._async_pool = AsyncConnectionPool.from_url(
+                self.redis_url.replace('/0', '/1'),
+                max_connections=self.max_connections // 2,
+                socket_timeout=self.socket_timeout,
+                socket_connect_timeout=self.socket_connect_timeout,
+                decode_responses=True
+            )
+            self._async_client = AsyncRedis(connection_pool=self._async_pool)
 
-        self._start_health_check()
-        logger.info(f"Redis connection pools initialized: {self.redis_url}")
+            self._start_health_check()
+        except Exception as e:
+            self._redis_available = False
+            self._init_error = str(e)
+            logger.warning(f"[WARN] Redis connection failed: {e}")
+            logger.warning(f"[WARN] Continuing without Redis (local mode)")
+
+    def is_available(self) -> bool:
+        """Check if Redis is available."""
+        if not self._redis_available:
+            return False
+        try:
+            if self._client:
+                self._client.ping()
+                return True
+        except Exception:
+            self._redis_available = False
+        return False
 
     def _start_health_check(self):
         """Start background health check."""
+        if not self._redis_available:
+            return
         self._running = True
         self._health_check_thread = threading.Thread(target=self._health_check_loop, daemon=True)
         self._health_check_thread.start()
@@ -94,25 +119,33 @@ class RedisConnectionPool:
                     self._client.ping()
             except Exception as e:
                 logger.warning(f"Redis health check failed: {e}")
+                self._redis_available = False
                 try:
-                    self._client = redis.Redis(connection_pool=self._sync_pool)
+                    if self._sync_pool:
+                        self._client = redis.Redis(connection_pool=self._sync_pool)
+                        self._client.ping()
+                        self._redis_available = True
                 except Exception as reinit_error:
-                    logger.error(f"Redis reconnection failed: {reinit_error}")
+                    logger.warning(f"Redis reconnection failed: {reinit_error}")
             time.sleep(self.health_check_interval)
 
     def get_client(self) -> redis.Redis:
         """Get sync Redis client."""
+        if not self._redis_available:
+            raise RuntimeError("Redis is not available. Using local mode.")
         if not self._client:
             self.initialize()
         return self._client
 
     def get_async_client(self) -> AsyncRedis:
         """Get async Redis client."""
+        if not self._redis_available:
+            raise RuntimeError("Redis is not available. Using local mode.")
         if not self._async_client:
             self.initialize()
         return self._async_client
 
-    def get_pubsub(self) -> redis.PubSub:
+    def get_pubsub(self) -> Any:
         """Get Redis PubSub client."""
         return redis.Redis(connection_pool=self._sync_pool).pubsub()
 

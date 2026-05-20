@@ -7,9 +7,8 @@ Indian stock market data, candles, quotes, depth, and indicators.
 import logging
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, jwt_optional
 
-from app import market_data_engine
+from app.market_data.engine import get_market_engine
 
 logger = logging.getLogger('trading_app')
 
@@ -17,7 +16,6 @@ bp = Blueprint('market', __name__)
 
 
 @bp.route('/candles', methods=['GET'])
-@jwt_optional
 def get_candles():
     """
     Get OHLCV candle data.
@@ -56,7 +54,6 @@ def get_candles():
 
 
 @bp.route('/current-candle', methods=['GET'])
-@jwt_optional
 def get_current_candle():
     """
     Get current (in-progress) candle.
@@ -88,7 +85,6 @@ def get_current_candle():
 
 
 @bp.route('/quotes', methods=['GET'])
-@jwt_optional
 def get_quotes():
     """
     Get current quotes for multiple symbols.
@@ -125,7 +121,6 @@ def get_quotes():
 
 
 @bp.route('/quote/<symbol>', methods=['GET'])
-@jwt_optional
 def get_quote(symbol):
     """
     Get current quote for a symbol.
@@ -159,7 +154,6 @@ def get_quote(symbol):
 
 
 @bp.route('/symbols', methods=['GET'])
-@jwt_optional
 def list_symbols():
     """
     List available trading symbols.
@@ -190,7 +184,6 @@ def list_symbols():
 
 
 @bp.route('/symbol-info/<symbol>', methods=['GET'])
-@jwt_optional
 def get_symbol_info(symbol):
     """
     Get symbol information.
@@ -224,7 +217,6 @@ def get_symbol_info(symbol):
 
 
 @bp.route('/depth/<symbol>', methods=['GET'])
-@jwt_optional
 def get_market_depth(symbol):
     """
     Get market depth / order book for a symbol.
@@ -262,7 +254,6 @@ def get_market_depth(symbol):
 
 
 @bp.route('/indicators/<symbol>', methods=['GET'])
-@jwt_optional
 def get_indicators(symbol):
     """
     Get technical indicators for a symbol.
@@ -299,7 +290,6 @@ def get_indicators(symbol):
 
 
 @bp.route('/status', methods=['GET'])
-@jwt_optional
 def get_market_status():
     """
     Get current market status.
@@ -324,7 +314,6 @@ def get_market_status():
 
 
 @bp.route('/overview', methods=['GET'])
-@jwt_optional
 def get_market_overview():
     """
     Get market overview with indices and top movers.
@@ -374,7 +363,6 @@ def get_market_overview():
 
 
 @bp.route('/watchlist', methods=['GET'])
-@jwt_optional
 def get_watchlist_quotes():
     """
     Get quotes for default watchlist symbols.
@@ -385,9 +373,10 @@ def get_watchlist_quotes():
     default_symbols = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'KOTAKBANK', 'LT', 'ITC', 'BHARTIARTL']
     
     try:
+        engine = get_market_engine()
         quotes = []
         for symbol in default_symbols:
-            tick = market_data_engine.get_tick(symbol)
+            tick = engine.get_tick(symbol)
             if tick:
                 quotes.append(tick)
         

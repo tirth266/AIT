@@ -1,11 +1,11 @@
 """
 Error Handlers
-==============
+=============
 Register global error handlers with Flask application.
 """
 
 import logging
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from werkzeug.exceptions import HTTPException
 from marshmallow import ValidationError as MarshmallowValidationError
 
@@ -17,6 +17,10 @@ logger = logging.getLogger('trading_app')
 def register_error_handlers(app: Flask) -> None:
     """Register all error handlers with Flask application."""
 
+    @app.before_request
+    def log_request():
+        logger.info(f"Incoming request: {request.method} {request.path}")
+
     @app.errorhandler(AppError)
     def handle_app_error(error: AppError):
         logger.warning(f"Application error: {error.message}")
@@ -24,6 +28,31 @@ def register_error_handlers(app: Flask) -> None:
 
     @app.errorhandler(MarshmallowValidationError)
     def handle_validation_error(error: MarshmallowValidationError):
+        return jsonify({
+            'error': 'VALIDATION_ERROR',
+            'message': 'Validation failed',
+            'details': error.messages
+        }), 400
+
+    @app.errorhandler(404)
+    def handle_not_found(error):
+        logger.warning(f"404 Not Found: {request.method} {request.path}")
+        return jsonify({
+            'error': 'NOT_FOUND',
+            'message': f'Resource not found: {request.path}'
+        }), 404
+
+    @app.errorhandler(405)
+    def handle_method_not_allowed(error):
+        logger.warning(f"405 Method Not Allowed: {request.method} {request.path}")
+        return jsonify({
+            'error': 'METHOD_NOT_ALLOWED',
+            'message': f'Method {request.method} not allowed for {request.path}'
+        }), 405
+
+    @app.errorhandler(500)
+    def handle_internal_error(error):
+        logger.error(f"Internal server error: {str(error)}", exc_info=True)
         return jsonify({
             'error': 'VALIDATION_ERROR',
             'message': 'Validation failed',

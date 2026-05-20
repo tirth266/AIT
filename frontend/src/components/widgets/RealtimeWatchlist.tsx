@@ -8,18 +8,19 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TrendingUp, TrendingDown, Star, X, RefreshCw, Plus } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useMarketStore, useAuthStore } from '../../store'
+import { useShallow } from 'zustand/react/shallow'
+import { useMarketStore, useTradingStore } from '../../store'
 import type { Quote } from '../../types'
 
 interface WatchlistItemProps {
   symbol: string
-  quote?: Quote
+  quote?: Partial<Quote>
   onRemove?: (symbol: string) => void
   onAddFavorite?: (symbol: string) => void
   isFavorite?: boolean
 }
 
-function WatchlistItem({ symbol, quote, onRemove, onAddFavorite, isFavorite }: WatchlistItemProps) {
+const WatchlistItem = React.memo(({ symbol, quote, onRemove, onAddFavorite, isFavorite }: WatchlistItemProps) => {
   const [flash, setFlash] = useState<'up' | 'down' | null>(null)
   const [prevPrice, setPrevPrice] = useState(quote?.last_price)
 
@@ -95,7 +96,7 @@ function WatchlistItem({ symbol, quote, onRemove, onAddFavorite, isFavorite }: W
       </div>
     </motion.div>
   )
-}
+})
 
 interface RealtimeWatchlistProps {
   className?: string
@@ -103,13 +104,15 @@ interface RealtimeWatchlistProps {
 }
 
 export function RealtimeWatchlist({ className, onSymbolSelect }: RealtimeWatchlistProps) {
-  const { quotes, fetchQuotes, prices } = useMarketStore()
-  const { mode } = useAuthStore()
+  const quotes = useMarketStore(useShallow(state => state.quotes))
+  const fetchQuotes = useMarketStore(state => state.fetchQuotes)
+  const mode = useTradingStore(state => state.mode)
   const [showAddModal, setShowAddModal] = useState(false)
 
   const symbols = useMemo(() => {
-    return Object.keys(quotes).length > 0
-      ? Object.keys(quotes)
+    const keys = Object.keys(quotes)
+    return keys.length > 0
+      ? keys
       : ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'BHARTIARTL', 'HINDUNILVR']
   }, [quotes])
 
@@ -117,14 +120,26 @@ export function RealtimeWatchlist({ className, onSymbolSelect }: RealtimeWatchli
     if (symbols.length > 0) {
       fetchQuotes(symbols)
     }
-  }, [])
+  }, [symbols, fetchQuotes])
 
   const watchlistQuotes = useMemo(() => {
     return symbols.map((symbol) => {
-      const quote = quotes.get(symbol)
+      const quote = quotes[symbol]
       return {
         symbol,
-        quote: quote || null,
+        quote: quote ? {
+          symbol: quote.symbol,
+          exchange: quote.exchange,
+          last_price: quote.ltp,
+          change: quote.change,
+          change_percent: quote.change_percent,
+          open: quote.open,
+          high: quote.high,
+          low: quote.low,
+          prev_close: quote.close, 
+          volume: quote.volume,
+          timestamp: quote.timestamp,
+        } : null,
       }
     })
   }, [symbols, quotes])

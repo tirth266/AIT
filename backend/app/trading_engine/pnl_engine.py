@@ -53,7 +53,7 @@ class PnLEngine:
         sell_value = sum(t.value for t in day_trades if t.transaction_type == "SELL")
         
         total_brokerage = sum(t.brokerage for t in day_trades)
-        total_taxes = t.stt + t.gst + t.stamp_duty for t in day_trades
+        total_taxes = sum(t.stt + t.gst + t.stamp_duty for t in day_trades)
         
         day_pnl = (sell_value - buy_value) - total_brokerage - total_taxes
         

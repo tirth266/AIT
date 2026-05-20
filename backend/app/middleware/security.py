@@ -96,6 +96,7 @@ class SecurityMiddleware:
                 "script-src 'self' 'unsafe-inline'; "
                 "style-src 'self' 'unsafe-inline'; "
                 "img-src 'self' data: https:; "
+                "font-src 'self' data: https:; "
                 "connect-src 'self' wss: https:; "
                 "frame-ancestors 'none';"
             )
@@ -112,6 +113,7 @@ class SecurityMiddleware:
             # Skip validation for certain paths
             if request.path.startswith('/health') or \
                request.path.startswith('/api/v1/auth/login') or \
+               request.path.startswith('/api/v1/broker/angelone/login') or \
                request.path == '/':
                 return None
 

@@ -19,12 +19,12 @@ class ProductionSocketConfig:
         """Get production configuration."""
 
         return {
-            'async_mode': 'eventlet',
-            'cors_allowed_origins': os.environ.get('CORS_ORIGINS', '*'),
+            'async_mode': os.environ.get('SOCKET_ASYNC_MODE', 'eventlet'),
+            'cors_allowed_origins': os.environ.get('FRONTEND_URL', 'http://localhost:5173'),
             'ping_timeout': 60,
             'ping_interval': 25,
             'max_http_buffer_size': 10000000,
-            'logger': True,
+            'logger': False,
             'engineio_logger': False,
             'json': False,
             'cookie': None,

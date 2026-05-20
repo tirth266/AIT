@@ -6,6 +6,9 @@ Custom exceptions for trading-related errors.
 
 from app.errors.base import TradingError as BaseTradingError, ErrorCode
 
+# Alias so that `from app.errors.trading import TradingError` works
+TradingError = BaseTradingError
+
 
 class InsufficientBalanceError(BaseTradingError):
     """Insufficient balance error."""

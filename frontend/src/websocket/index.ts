@@ -6,7 +6,6 @@
 
 import { useEffect, useCallback, useRef } from 'react'
 import { wsManager, WebSocketManager } from './websocket.manager'
-import { useAuthStore } from '../store/auth'
 import { useMarketStore } from '../store/market'
 import { useTradingStore } from '../store/trading'
 import { useNotificationStore } from '../store/notifications'
@@ -21,24 +20,20 @@ import type {
 } from './websocket.types'
 
 export function useWebSocket() {
-  const isAuthenticated = useAuthStore(state => state.isAuthenticated)
-  const token = useAuthStore(state => state.accessToken)
   const initialized = useRef(false)
 
   useEffect(() => {
-    if (isAuthenticated && token && !initialized.current) {
+    if (!initialized.current) {
       console.log('[Hook] Connecting WebSocket')
-      wsManager.connect(token)
+      wsManager.connect()
       initialized.current = true
     }
 
     return () => {
-      if (!isAuthenticated) {
-        wsManager.disconnect()
-        initialized.current = false
-      }
+      wsManager.disconnect()
+      initialized.current = false
     }
-  }, [isAuthenticated, token])
+  }, [])
 
   return wsManager
 }

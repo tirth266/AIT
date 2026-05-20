@@ -1,8 +1,9 @@
 """
 Redis Pub/Sub Broadcasting System
-=================================
+================================
 Distributed message broadcasting across multiple SocketIO server nodes.
 Enables horizontal scaling with cross-node communication.
+Falls back to local in-memory mode if Redis is unavailable.
 """
 
 import os
@@ -48,6 +49,7 @@ class RedisPubSubManager:
     """
     Redis Pub/Sub manager for distributed WebSocket broadcasting.
     Handles cross-node message routing and subscription management.
+    Falls back to local in-memory mode if Redis is unavailable.
     """
 
     CHANNEL_PREFIX = "ws:pub:"
@@ -60,6 +62,7 @@ class RedisPubSubManager:
         self._async_pubsub: Optional[Any] = None
         self._pubsub_thread: Optional[threading.Thread] = None
         self._running = False
+        self._redis_available = False
 
         self._subscribers: Dict[str, Set[Callable]] = {}
         self._room_members: Dict[str, Set[str]] = {}
@@ -68,10 +71,21 @@ class RedisPubSubManager:
         self._message_queue: asyncio.Queue = asyncio.Queue(maxsize=10000)
         self._worker_task: Optional[asyncio.Task] = None
 
+        self._local_messages: List[Dict] = []
+        self._local_messages_lock = threading.Lock()
+
     def initialize(self):
-        """Initialize Pub/Sub subscriptions."""
-        self._setup_pubsub()
-        self._start_subscriber_thread()
+        """Initialize Pub/Sub subscriptions with graceful fallback."""
+        try:
+            self._setup_pubsub()
+            self._start_subscriber_thread()
+            self._redis_available = True
+            logger.info(f"[OK] Redis Pub/Sub connected for node {self.node_id}")
+        except Exception as e:
+            self._redis_available = False
+            logger.warning(f"[WARN] Redis unavailable: {e}")
+            logger.warning(f"[WARN] Using local in-memory websocket mode (scalability disabled)")
+        
         self._start_async_worker()
         logger.info(f"PubSub manager initialized for node {self.node_id}")
 
@@ -94,19 +108,32 @@ class RedisPubSubManager:
 
     def _pubsub_loop(self):
         """Pub/Sub message listening loop."""
-        for message in self._pubsub.listen():
-            if not self._running:
-                break
-            if message['type'] == 'message':
-                try:
-                    data = json.loads(message['data'])
-                    asyncio.run(self._handle_message(data))
-                except Exception as e:
-                    logger.error(f"Failed to handle pubsub message: {e}")
+        try:
+            for message in self._pubsub.listen():
+                if not self._running:
+                    break
+                if message['type'] == 'message':
+                    try:
+                        data = json.loads(message['data'])
+                        asyncio.run(self._handle_message(data))
+                    except Exception as e:
+                        logger.error(f"Failed to handle pubsub message: {e}")
+        except Exception as e:
+            logger.warning(f"Pub/Sub listener stopped: {e}")
+            self._redis_available = False
 
-    async def _start_async_worker(self):
+    def _start_async_worker(self):
         """Start async worker for processing messages."""
-        self._worker_task = asyncio.create_task(self._process_messages())
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                self._worker_task = loop.create_task(self._process_messages())
+            else:
+                self._worker_task = asyncio.create_task(self._process_messages())
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._worker_task = loop.create_task(self._process_messages())
 
     async def _process_messages(self):
         """Async message processor."""
@@ -179,14 +206,17 @@ class RedisPubSubManager:
             'target_room': target_room
         }
 
-        try:
-            redis = get_redis_async()
-            await redis.publish(
-                f"{self.CHANNEL_PREFIX}{channel}",
-                json.dumps(message)
-            )
-        except Exception as e:
-            logger.error(f"Failed to publish to {channel}: {e}")
+        if self._redis_available:
+            try:
+                redis_client = get_redis_async()
+                await redis_client.publish(
+                    f"{self.CHANNEL_PREFIX}{channel}",
+                    json.dumps(message)
+                )
+            except Exception as e:
+                logger.error(f"Failed to publish to {channel}: {e}")
+        else:
+            self._handle_local_message(message)
 
     def publish_sync(
         self,
@@ -197,23 +227,35 @@ class RedisPubSubManager:
         target_sids: List[str] = None,
         target_room: str = None
     ):
-        """Synchronous publish."""
-        try:
-            redis = get_redis()
-            message = {
-                'id': f"{time.time()}-{os.urandom(4).hex()}",
-                'channel': channel,
-                'event': event,
-                'data': data,
-                'timestamp': time.time(),
-                'priority': priority.value,
-                'source_node': self.node_id,
-                'target_sids': target_sids or [],
-                'target_room': target_room
-            }
-            redis.publish(f"{self.CHANNEL_PREFIX}{channel}", json.dumps(message))
-        except Exception as e:
-            logger.error(f"Failed to publish: {e}")
+        """Synchronous publish with local fallback."""
+        message = {
+            'id': f"{time.time()}-{os.urandom(4).hex()}",
+            'channel': channel,
+            'event': event,
+            'data': data,
+            'timestamp': time.time(),
+            'priority': priority.value,
+            'source_node': self.node_id,
+            'target_sids': target_sids or [],
+            'target_room': target_room
+        }
+
+        if self._redis_available:
+            try:
+                redis_client = get_redis()
+                redis_client.publish(f"{self.CHANNEL_PREFIX}{channel}", json.dumps(message))
+            except Exception as e:
+                logger.error(f"Failed to publish: {e}")
+                self._handle_local_message(message)
+        else:
+            self._handle_local_message(message)
+
+    def _handle_local_message(self, message: Dict):
+        """Handle message locally (fallback mode)."""
+        with self._local_messages_lock:
+            self._local_messages.append(message)
+            if len(self._local_messages) > 1000:
+                self._local_messages = self._local_messages[-500:]
 
     async def join_room(self, room: str, sid: str):
         """Join a room for distributed broadcasting."""
@@ -222,11 +264,12 @@ class RedisPubSubManager:
                 self._room_members[room] = set()
             self._room_members[room].add(sid)
 
-        try:
-            redis = get_redis_async()
-            await redis.sadd(f"{self.ROOM_CHANNEL_PREFIX}{room}", sid)
-        except Exception as e:
-            logger.error(f"Failed to join room: {e}")
+        if self._redis_available:
+            try:
+                redis_client = get_redis_async()
+                await redis_client.sadd(f"{self.ROOM_CHANNEL_PREFIX}{room}", sid)
+            except Exception as e:
+                logger.debug(f"Failed to join room in Redis: {e}")
 
     async def leave_room(self, room: str, sid: str):
         """Leave a room."""
@@ -234,21 +277,25 @@ class RedisPubSubManager:
             if room in self._room_members:
                 self._room_members[room].discard(sid)
 
-        try:
-            redis = get_redis_async()
-            await redis.srem(f"{self.ROOM_CHANNEL_PREFIX}{room}, sid")
-        except Exception as e:
-            logger.error(f"Failed to leave room: {e}")
+        if self._redis_available:
+            try:
+                redis_client = get_redis_async()
+                await redis_client.srem(f"{self.ROOM_CHANNEL_PREFIX}{room}", sid)
+            except Exception as e:
+                logger.debug(f"Failed to leave room in Redis: {e}")
 
     async def get_room_members(self, room: str) -> Set[str]:
         """Get all members of a room."""
-        try:
-            redis = get_redis_async()
-            members = await redis.smembers(f"{self.ROOM_CHANNEL_PREFIX}{room}")
-            return members
-        except Exception as e:
-            logger.error(f"Failed to get room members: {e}")
-            return set()
+        if self._redis_available:
+            try:
+                redis_client = get_redis_async()
+                members = await redis_client.smembers(f"{self.ROOM_CHANNEL_PREFIX}{room}")
+                return members
+            except Exception as e:
+                logger.debug(f"Failed to get room members from Redis: {e}")
+        
+        with self._lock:
+            return self._room_members.get(room, set()).copy()
 
     def broadcast_to_room(self, room: str, event: str, data: Dict):
         """Broadcast to all members of a room across nodes."""
@@ -290,6 +337,7 @@ class RedisPubSubManager:
 class RoomManager:
     """
     Distributed room management with Redis backend.
+    Falls back to local in-memory mode if Redis unavailable.
     """
 
     ROOM_KEY_PREFIX = "ws:room:"
@@ -297,96 +345,121 @@ class RoomManager:
 
     def __init__(self):
         self._local_rooms: Dict[str, Set[str]] = {}
+        self._local_room_data: Dict[str, Dict] = {}
         self._lock = threading.Lock()
+        self._redis_available = True
+
+    def _check_redis(self) -> bool:
+        """Check if Redis is available."""
+        try:
+            import redis
+            r = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:6379/0'))
+            r.ping()
+            return True
+        except Exception:
+            return False
 
     async def create_room(self, room_id: str, metadata: Dict = None) -> bool:
         """Create a new room."""
-        try:
-            redis = get_redis_async()
-            if metadata:
-                await redis.hset(
-                    f"{self.ROOM_DATA_PREFIX}{room_id}",
-                    mapping=metadata
-                )
-            return True
-        except Exception as e:
-            logger.error(f"Failed to create room: {e}")
-            return False
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                if metadata:
+                    await redis_client.hset(
+                        f"{self.ROOM_DATA_PREFIX}{room_id}",
+                        mapping=metadata
+                    )
+                return True
+            except Exception as e:
+                logger.debug(f"Failed to create room in Redis: {e}")
+        
+        with self._lock:
+            self._local_room_data[room_id] = metadata or {}
+        return True
 
     async def delete_room(self, room_id: str) -> bool:
         """Delete a room."""
-        try:
-            redis = get_redis_async()
-            await redis.delete(
-                f"{self.ROOM_KEY_PREFIX}{room_id}",
-                f"{self.ROOM_DATA_PREFIX}{room_id}"
-            )
-            with self._lock:
-                self._local_rooms.pop(room_id, None)
-            return True
-        except Exception as e:
-            logger.error(f"Failed to delete room: {e}")
-            return False
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                await redis_client.delete(
+                    f"{self.ROOM_KEY_PREFIX}{room_id}",
+                    f"{self.ROOM_DATA_PREFIX}{room_id}"
+                )
+            except Exception as e:
+                logger.debug(f"Failed to delete room from Redis: {e}")
+        
+        with self._lock:
+            self._local_rooms.pop(room_id, None)
+            self._local_room_data.pop(room_id, None)
+        return True
 
     async def add_member(self, room_id: str, sid: str) -> bool:
         """Add member to room."""
-        try:
-            redis = get_redis_async()
-            await redis.sadd(f"{self.ROOM_KEY_PREFIX}{room_id}", sid)
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                await redis_client.sadd(f"{self.ROOM_KEY_PREFIX}{room_id}", sid)
+            except Exception as e:
+                logger.debug(f"Failed to add member in Redis: {e}")
 
-            with self._lock:
-                if room_id not in self._local_rooms:
-                    self._local_rooms[room_id] = set()
-                self._local_rooms[room_id].add(sid)
-
-            return True
-        except Exception as e:
-            logger.error(f"Failed to add room member: {e}")
-            return False
+        with self._lock:
+            if room_id not in self._local_rooms:
+                self._local_rooms[room_id] = set()
+            self._local_rooms[room_id].add(sid)
+        return True
 
     async def remove_member(self, room_id: str, sid: str) -> bool:
         """Remove member from room."""
-        try:
-            redis = get_redis_async()
-            await redis.srem(f"{self.ROOM_KEY_PREFIX}{room_id}, sid")
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                await redis_client.srem(f"{self.ROOM_KEY_PREFIX}{room_id}", sid)
+            except Exception as e:
+                logger.debug(f"Failed to remove member from Redis: {e}")
 
-            with self._lock:
-                if room_id in self._local_rooms:
-                    self._local_rooms[room_id].discard(sid)
-
-            return True
-        except Exception as e:
-            logger.error(f"Failed to remove room member: {e}")
-            return False
+        with self._lock:
+            if room_id in self._local_rooms:
+                self._local_rooms[room_id].discard(sid)
+        return True
 
     async def get_members(self, room_id: str) -> Set[str]:
         """Get all room members."""
-        try:
-            redis = get_redis_async()
-            members = await redis.smembers(f"{self.ROOM_KEY_PREFIX}{room_id}")
-            return members
-        except Exception as e:
-            logger.error(f"Failed to get room members: {e}")
-            return set()
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                members = await redis_client.smembers(f"{self.ROOM_KEY_PREFIX}{room_id}")
+                return members
+            except Exception as e:
+                logger.debug(f"Failed to get members from Redis: {e}")
+        
+        with self._lock:
+            return self._local_rooms.get(room_id, set()).copy()
 
     async def get_member_count(self, room_id: str) -> int:
         """Get room member count."""
-        try:
-            redis = get_redis_async()
-            return await redis.scard(f"{self.ROOM_KEY_PREFIX}{room_id}")
-        except Exception as e:
-            logger.error(f"Failed to get member count: {e}")
-            return 0
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                return await redis_client.scard(f"{self.ROOM_KEY_PREFIX}{room_id}")
+            except Exception as e:
+                logger.debug(f"Failed to get member count from Redis: {e}")
+        
+        with self._lock:
+            return len(self._local_rooms.get(room_id, set()))
 
     async def get_room_metadata(self, room_id: str) -> Optional[Dict]:
         """Get room metadata."""
-        try:
-            redis = get_redis_async()
-            data = await redis.hgetall(f"{self.ROOM_DATA_PREFIX}{room_id}")
-            return data if data else None
-        except Exception as e:
-            logger.error(f"Failed to get room metadata: {e}")
-            return None
+        if self._redis_available and self._check_redis():
+            try:
+                redis_client = get_redis_async()
+                data = await redis_client.hgetall(f"{self.ROOM_DATA_PREFIX}{room_id}")
+                return data if data else None
+            except Exception as e:
+                logger.debug(f"Failed to get room metadata from Redis: {e}")
+        
+        with self._lock:
+            return self._local_room_data.get(room_id)
 
 
 _global_pubsub_manager: Optional[RedisPubSubManager] = None

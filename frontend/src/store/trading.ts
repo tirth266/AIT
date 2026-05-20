@@ -1,5 +1,14 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
+import { 
+  normalizeOrder, 
+  normalizePosition, 
+  normalizeTrade, 
+  normalizeStrategy,
+  safeNumber,
+  safeString,
+  normalizeSymbol
+} from '../utils/normalization'
 
 export interface Position {
   _id: string
@@ -110,22 +119,63 @@ export interface Bot {
   uptime_seconds?: number
 }
 
+export const DEFAULT_RISK_SETTINGS: RiskSettings = {
+  stop_loss_percent: 0,
+  take_profit_percent: 0,
+  trailing_stop_enabled: false,
+  trailing_stop_percent: 0,
+  position_size_type: 'fixed',
+  position_size: 0,
+};
+
+export const DEFAULT_STRATEGY: Strategy = {
+  _id: '',
+  strategy_name: '',
+  symbol: '',
+  timeframe: '',
+  mode: 'paper',
+  broker: '',
+  is_active: false,
+  indicators: [],
+  entry_conditions: [],
+  exit_conditions: [],
+  risk_settings: DEFAULT_RISK_SETTINGS,
+  created_at: new Date(0).toISOString(),
+};
+
+export const normalizeBot = (raw: any): Bot => {
+  return {
+    strategy_id: safeString(raw?.strategy_id),
+    strategy_name: safeString(raw?.strategy_name),
+    symbol: raw?.symbol ? normalizeSymbol(raw.symbol) : undefined,
+    status: (raw?.status || 'stopped') as any,
+    mode: (raw?.mode || 'paper') as any,
+    last_signal: raw?.last_signal as any,
+    last_signal_time: raw?.last_signal_time,
+    trades_today: safeNumber(raw?.trades_today),
+    pnl_today: safeNumber(raw?.pnl_today),
+    uptime_seconds: safeNumber(raw?.uptime_seconds),
+  };
+};
+
 interface TradingState {
+  mode: 'paper' | 'live'
   positions: Position[]
   trades: Trade[]
   orders: Order[]
   strategies: Strategy[]
   bots: Bot[]
-  selectedStrategy: Strategy | null
+  selectedStrategy: Strategy
   isLoading: boolean
   isInitialized: boolean
   
+  setMode: (mode: 'paper' | 'live') => void
   setPositions: (positions: Position[]) => void
   setTrades: (trades: Trade[]) => void
   setOrders: (orders: Order[]) => void
   setStrategies: (strategies: Strategy[]) => void
   setBots: (bots: Bot[]) => void
-  setSelectedStrategy: (strategy: Strategy | null) => void
+  setSelectedStrategy: (strategy: Strategy) => void
   addPosition: (position: Position) => void
   updatePosition: (position: Position) => void
   removePosition: (id: string) => void
@@ -139,12 +189,13 @@ interface TradingState {
 }
 
 const initialState = {
+  mode: 'paper' as const,
   positions: [] as Position[],
   trades: [] as Trade[],
   orders: [] as Order[],
   strategies: [] as Strategy[],
   bots: [] as Bot[],
-  selectedStrategy: null as Strategy | null,
+  selectedStrategy: DEFAULT_STRATEGY,
   isLoading: false,
   isInitialized: false,
 }
@@ -154,43 +205,51 @@ export const useTradingStore = create<TradingState>()(
     (set) => ({
       ...initialState,
 
+      setMode: (mode) => set({ mode }),
+
       setPositions: (positions) => set({ 
-        positions: Array.isArray(positions) ? positions : [] 
+        positions: Array.isArray(positions) ? positions.map(p => normalizePosition(p) as any) : [] 
       }),
       
       setTrades: (trades) => set({ 
-        trades: Array.isArray(trades) ? trades : [] 
+        trades: Array.isArray(trades) ? trades.map(t => normalizeTrade(t) as any) : [] 
       }),
       
       setOrders: (orders) => set({ 
-        orders: Array.isArray(orders) ? orders : [] 
+        orders: Array.isArray(orders) ? orders.map(o => normalizeOrder(o) as any) : [] 
       }),
       
       setStrategies: (strategies) => set({ 
-        strategies: Array.isArray(strategies) ? strategies : [] 
+        strategies: Array.isArray(strategies) ? strategies.map(s => normalizeStrategy(s) as any) : [] 
       }),
       
       setBots: (bots) => set({ 
-        bots: Array.isArray(bots) ? bots : [] 
+        bots: Array.isArray(bots) ? bots.map(normalizeBot) : [] 
       }),
       
       setSelectedStrategy: (strategy) => set({ 
-        selectedStrategy: strategy ?? null 
+        selectedStrategy: strategy ? normalizeStrategy(strategy) as any : DEFAULT_STRATEGY 
       }),
       
-      addPosition: (position) => set((state) => ({ 
-        positions: [position, ...(Array.isArray(state.positions) ? state.positions : [])] 
-      })),
+      addPosition: (position) => {
+        const normalized = normalizePosition(position) as any;
+        set((state) => ({ 
+          positions: [normalized, ...(Array.isArray(state.positions) ? state.positions : [])] 
+        }));
+      },
       
-      updatePosition: (position) => set((state) => ({
-        positions: Array.isArray(state.positions)
-          ? state.positions.map((p) => 
-              p?._id === position?._id || p?.position_id === position?.position_id 
-                ? position 
-                : p
-            )
-          : []
-      })),
+      updatePosition: (position) => {
+        const normalized = normalizePosition(position) as any;
+        set((state) => ({
+          positions: Array.isArray(state.positions)
+            ? state.positions.map((p) => 
+                p?._id === normalized?._id || p?.position_id === normalized?.position_id 
+                  ? normalized 
+                  : p
+              )
+            : []
+        }));
+      },
       
       removePosition: (id) => set((state) => ({
         positions: Array.isArray(state.positions)
@@ -198,33 +257,45 @@ export const useTradingStore = create<TradingState>()(
           : []
       })),
       
-      addTrade: (trade) => set((state) => ({ 
-        trades: [trade, ...(Array.isArray(state.trades) ? state.trades : [])] 
-      })),
+      addTrade: (trade) => {
+        const normalized = normalizeTrade(trade) as any;
+        set((state) => ({ 
+          trades: [normalized, ...(Array.isArray(state.trades) ? state.trades : [])] 
+        }));
+      },
       
-      updateTrade: (trade) => set((state) => ({
-        trades: Array.isArray(state.trades)
-          ? state.trades.map((t) => 
-              t?._id === trade?._id || t?.trade_id === trade?.trade_id 
-                ? trade 
-                : t
-            )
-          : []
-      })),
+      updateTrade: (trade) => {
+        const normalized = normalizeTrade(trade) as any;
+        set((state) => ({
+          trades: Array.isArray(state.trades)
+            ? state.trades.map((t) => 
+                t?._id === normalized?._id || t?.trade_id === normalized?.trade_id 
+                  ? normalized 
+                  : t
+              )
+            : []
+        }));
+      },
       
-      addOrder: (order) => set((state) => ({ 
-        orders: [order, ...(Array.isArray(state.orders) ? state.orders : [])] 
-      })),
+      addOrder: (order) => {
+        const normalized = normalizeOrder(order) as any;
+        set((state) => ({ 
+          orders: [normalized, ...(Array.isArray(state.orders) ? state.orders : [])] 
+        }));
+      },
       
-      updateOrder: (order) => set((state) => ({
-        orders: Array.isArray(state.orders)
-          ? state.orders.map((o) => 
-              o?.order_id === order?.order_id 
-                ? order 
-                : o
-            )
-          : []
-      })),
+      updateOrder: (order) => {
+        const normalized = normalizeOrder(order) as any;
+        set((state) => ({
+          orders: Array.isArray(state.orders)
+            ? state.orders.map((o) => 
+                o?.order_id === normalized?.order_id 
+                  ? normalized 
+                  : o
+              )
+            : []
+        }));
+      },
       
       setLoading: (isLoading) => set({ isLoading }),
       

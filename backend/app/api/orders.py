@@ -9,7 +9,6 @@ import uuid
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -19,7 +18,6 @@ bp = Blueprint('orders', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_orders():
     """
     List orders with filtering options.
@@ -36,7 +34,7 @@ def list_orders():
     Returns:
         List of orders
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     status = request.args.get('status')
     order_type = request.args.get('order_type')
     transaction_type = request.args.get('transaction_type')
@@ -82,7 +80,6 @@ def list_orders():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def create_order():
     """
     Create a new order.
@@ -105,7 +102,7 @@ def create_order():
     Returns:
         Created order details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     required_fields = ['symbol', 'transaction_type', 'quantity']
@@ -166,7 +163,6 @@ def create_order():
 
 
 @bp.route('/<order_id>', methods=['GET'])
-@jwt_required()
 def get_order(order_id):
     """
     Get a specific order.
@@ -174,7 +170,7 @@ def get_order(order_id):
     Returns:
         Order details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -210,7 +206,6 @@ def get_order(order_id):
 
 
 @bp.route('/<order_id>/cancel', methods=['POST'])
-@jwt_required()
 def cancel_order(order_id):
     """
     Cancel an open order.
@@ -223,7 +218,7 @@ def cancel_order(order_id):
     Returns:
         Cancelled order details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -276,7 +271,6 @@ def cancel_order(order_id):
 
 
 @bp.route('/<order_id>/modify', methods=['PUT'])
-@jwt_required()
 def modify_order(order_id):
     """
     Modify an open order.
@@ -292,7 +286,7 @@ def modify_order(order_id):
     Returns:
         Modified order details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     db = get_db()
@@ -349,7 +343,6 @@ def modify_order(order_id):
 
 
 @bp.route('/<order_id>/execute', methods=['POST'])
-@jwt_required()
 def execute_order(order_id):
     """
     Execute/fill an order (for paper trading).
@@ -363,7 +356,7 @@ def execute_order(order_id):
     Returns:
         Executed order details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     db = get_db()
@@ -428,7 +421,6 @@ def execute_order(order_id):
 
 
 @bp.route('/cancel-all', methods=['POST'])
-@jwt_required()
 def cancel_all_orders():
     """
     Cancel all open orders for a symbol or all.
@@ -441,7 +433,7 @@ def cancel_all_orders():
     Returns:
         Number of cancelled orders
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     db = get_db()
@@ -475,7 +467,6 @@ def cancel_all_orders():
 
 
 @bp.route('/stats', methods=['GET'])
-@jwt_required()
 def get_order_stats():
     """
     Get order statistics.
@@ -488,7 +479,7 @@ def get_order_stats():
     Returns:
         Order statistics
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     mode = request.args.get('mode', 'paper')
     symbol = request.args.get('symbol')
     period = request.args.get('period', 'all')

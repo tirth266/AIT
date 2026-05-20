@@ -6,21 +6,46 @@ Environment-based configuration for Flask application.
 
 import os
 from datetime import timedelta
+from urllib.parse import quote_plus
+import logging
+
+logger = logging.getLogger('trading_app')
+
+def build_mongo_uri() -> str:
+    """
+    Safely build MongoDB URI from environment variables.
+    Handles RFC 3986 escaping for credentials.
+    """
+    user = os.environ.get("MONGO_USER", "")
+    password = quote_plus(os.environ.get("MONGO_PASSWORD", ""))
+    host = os.environ.get("MONGO_HOST", "localhost")
+    db = os.environ.get("MONGO_DB_NAME", "trading_platform")
+    options = os.environ.get("MONGO_OPTIONS", "")
+
+    auth = f"{user}:{password}@" if user else ""
+
+    protocol = (
+        "mongodb+srv"
+        if ".mongodb.net" in host
+        else "mongodb"
+    )
+
+    uri = f"{protocol}://{auth}{host}/{db}"
+
+    if options:
+        uri += f"?{options}"
+
+    return uri
 
 
 class Config:
     """Base configuration with common settings."""
 
     SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key-change-in-production')
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=30)
-    JWT_TOKEN_LOCATION = ['headers']
-    JWT_HEADER_NAME = 'Authorization'
-    JWT_HEADER_TYPE = 'Bearer'
 
-    MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/trading_db')
-    MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'trading_db')
+    # Secure MongoDB configuration
+    MONGO_URI = build_mongo_uri()
+    MONGO_DB_NAME = os.environ.get('MONGO_DB_NAME', 'trading_platform')
 
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
     CELERY_BROKER_URL = os.environ.get('CELERY_BROKER_URL', 'redis://localhost:6379/1')
@@ -101,6 +126,17 @@ class Config:
     ENABLE_LIVE_TRADING = os.environ.get('ENABLE_LIVE_TRADING', 'false').lower() == 'true'
     ENABLE_PAPER_TRADING = os.environ.get('ENABLE_PAPER_TRADING', 'true').lower() == 'true'
 
+    # Angel One Integration
+    ANGELONE_CLIENT_ID = os.environ.get('ANGELONE_CLIENT_ID', '')
+    ANGELONE_API_KEY = os.environ.get('ANGELONE_API_KEY', '')
+    ANGELONE_SECRET_KEY = os.environ.get('ANGELONE_SECRET_KEY', '')
+    ANGELONE_MPIN = os.environ.get('ANGELONE_MPIN', '')
+    ANGELONE_TOTP_SECRET = os.environ.get('ANGELONE_TOTP_SECRET', '')
+
+    # SocketIO Configuration
+    SOCKET_ASYNC_MODE = os.environ.get('SOCKET_ASYNC_MODE', 'eventlet')
+    SOCKETIO_MESSAGE_QUEUE = os.environ.get('SOCKETIO_MESSAGE_QUEUE', 'redis://localhost:6379/3')
+
 
 class DevelopmentConfig(Config):
     """Development environment configuration."""
@@ -121,7 +157,7 @@ class ProductionConfig(Config):
 
     @classmethod
     def init_app(cls, app):
-        Config.init_app(app)
+        pass
 
 
 class TestingConfig(Config):
@@ -129,7 +165,8 @@ class TestingConfig(Config):
     DEBUG = True
     TESTING = True
     ENV = 'testing'
-    MONGO_URI = os.environ.get('TEST_MONGO_URI', 'mongodb://localhost:27017/trading_db_test')
+    # For testing, we expect MONGO_DB_NAME to be set to a test database in the environment
+    MONGO_URI = build_mongo_uri()
     REDIS_URL = os.environ.get('TEST_REDIS_URL', 'redis://localhost:6379/10')
     CELERY_BROKER_URL = os.environ.get('TEST_CELERY_BROKER_URL', 'redis://localhost:6379/11')
     CELERY_RESULT_BACKEND = os.environ.get('TEST_CELERY_RESULT_BACKEND', 'redis://localhost:6379/12')

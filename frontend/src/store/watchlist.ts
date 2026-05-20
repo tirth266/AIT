@@ -1,11 +1,38 @@
 import { create } from 'zustand'
 import { watchlistApi, marketApi } from '../services/api'
 import type { Watchlist, Quote } from '../types'
+import { 
+  safeString, 
+  safeTimestamp, 
+  normalizeSymbol, 
+  safeNumber,
+  normalizeTick
+} from '../utils/normalization'
+
+export const DEFAULT_WATCHLIST: Watchlist = {
+  watchlist_id: '',
+  name: '',
+  symbols: [],
+  created_at: new Date(0).toISOString(),
+  updated_at: new Date(0).toISOString(),
+  is_default: false,
+};
+
+export const normalizeWatchlist = (raw: any): Watchlist => {
+  return {
+    watchlist_id: safeString(raw?.watchlist_id || raw?._id),
+    name: safeString(raw?.name),
+    symbols: Array.isArray(raw?.symbols) ? raw.symbols.map(normalizeSymbol) : [],
+    is_default: !!raw?.is_default,
+    created_at: safeTimestamp(raw?.created_at),
+    updated_at: safeTimestamp(raw?.updated_at),
+  };
+};
 
 interface WatchlistState {
   watchlists: Watchlist[]
-  activeWatchlist: Watchlist | null
-  quotes: Map<string, Quote>
+  activeWatchlist: Watchlist
+  quotes: Record<string, Quote>
   isLoading: boolean
   error: string | null
 
@@ -23,8 +50,8 @@ interface WatchlistState {
 
 export const useWatchlistStore = create<WatchlistState>((set, get) => ({
   watchlists: [],
-  activeWatchlist: null,
-  quotes: new Map(),
+  activeWatchlist: DEFAULT_WATCHLIST,
+  quotes: {},
   isLoading: false,
   error: null,
 
@@ -32,10 +59,13 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
     set({ isLoading: true, error: null })
     try {
       const response = await watchlistApi.list()
-      set({ watchlists: response.data.data, isLoading: false })
+      const watchlists = Array.isArray(response.data.data) 
+        ? response.data.data.map(normalizeWatchlist) 
+        : [];
+      set({ watchlists, isLoading: false })
 
-      if (response.data.data.length > 0 && !get().activeWatchlist) {
-        const defaultList = response.data.data.find((w: Watchlist) => w.is_default) || response.data.data[0]
+      if (watchlists.length > 0 && get().activeWatchlist.watchlist_id === '') {
+        const defaultList = watchlists.find((w: Watchlist) => w.is_default) || watchlists[0]
         set({ activeWatchlist: defaultList })
         if (defaultList.symbols.length > 0) {
           get().fetchQuotes(defaultList.symbols)
@@ -54,7 +84,7 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
       if (watchlist.symbols.length > 0) {
         await get().fetchQuotes(watchlist.symbols)
       } else {
-        set({ quotes: new Map() })
+        set({ quotes: {} })
       }
     }
   },
@@ -83,8 +113,8 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
   deleteWatchlist: async (id) => {
     try {
       await watchlistApi.delete(id)
-      if (get().activeWatchlist?.watchlist_id === id) {
-        set({ activeWatchlist: null })
+      if (get().activeWatchlist.watchlist_id === id) {
+        set({ activeWatchlist: DEFAULT_WATCHLIST })
       }
       await get().fetchWatchlists()
     } catch (error) {
@@ -97,7 +127,7 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
     try {
       await watchlistApi.addStocks(id, { symbols })
       await get().fetchWatchlists()
-      if (get().activeWatchlist?.watchlist_id === id) {
+      if (get().activeWatchlist.watchlist_id === id) {
         await get().fetchQuotes(symbols)
       }
     } catch (error) {
@@ -109,8 +139,8 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
   removeStock: async (id, symbol) => {
     try {
       await watchlistApi.removeStock(id, symbol)
-      const newQuotes = new Map(get().quotes)
-      newQuotes.delete(symbol)
+      const newQuotes = { ...get().quotes }
+      delete newQuotes[normalizeSymbol(symbol)]
       set({ quotes: newQuotes })
       await get().fetchWatchlists()
     } catch (error) {
@@ -123,10 +153,15 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
     if (symbols.length === 0) return
     try {
       const response = await marketApi.quotes(symbols.join(','))
-      const newQuotes = new Map<string, Quote>()
-      response.data.data.forEach((quote: Quote) => {
-        newQuotes.set(quote.symbol, quote)
-      })
+      const newQuotes: Record<string, Quote> = { ...get().quotes }
+      if (Array.isArray(response.data.data)) {
+        response.data.data.forEach((quote: any) => {
+          const normalized = normalizeTick(quote)
+          if (normalized?.symbol) {
+            newQuotes[normalized.symbol] = normalized as any
+          }
+        })
+      }
       set({ quotes: newQuotes })
     } catch (error) {
       console.error('Failed to fetch quotes:', error)
@@ -134,16 +169,17 @@ export const useWatchlistStore = create<WatchlistState>((set, get) => ({
   },
 
   updateQuote: (symbol, price, change, changePercent) => {
-    const currentQuote = get().quotes.get(symbol)
+    const normSymbol = normalizeSymbol(symbol)
+    const currentQuote = get().quotes[normSymbol]
     if (currentQuote) {
-      const newQuotes = new Map(get().quotes)
-      newQuotes.set(symbol, {
+      const newQuotes = { ...get().quotes }
+      newQuotes[normSymbol] = {
         ...currentQuote,
-        last_price: price,
-        change,
-        change_percent: changePercent,
+        last_price: safeNumber(price),
+        change: safeNumber(change),
+        change_percent: safeNumber(changePercent),
         timestamp: new Date().toISOString(),
-      })
+      }
       set({ quotes: newQuotes })
     }
   },

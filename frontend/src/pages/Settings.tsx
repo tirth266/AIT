@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Save,
   Link,
@@ -11,14 +11,17 @@ import {
   CheckCircle,
   XCircle,
   AlertTriangle,
+  ChevronDown,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { Card, CardHeader, CardTitle, Button, Input, Select, Badge } from '../components/ui'
 import { mockSettings } from '../services/mockData'
+import { AngelOneCard, AngelOneSettings } from '../broker/angelone'
 
 export function SettingsPage() {
   const [settings, setSettings] = useState(mockSettings)
   const [saved, setSaved] = useState(false)
+  const [showAngelConfig, setShowAngelConfig] = useState(false)
 
   const handleSave = () => {
     setSaved(true)
@@ -51,41 +54,61 @@ export function SettingsPage() {
               <CardTitle>Broker Connections</CardTitle>
             </CardHeader>
             <div className="space-y-4">
-              {brokers.map((broker) => {
-                const isConnected = settings.brokers[broker.id as keyof typeof settings.brokers]?.is_connected
+              <AngelOneCard onConnect={() => setShowAngelConfig(!showAngelConfig)} />
+              
+              <AnimatePresence>
+                {showAngelConfig && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <AngelOneSettings />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                return (
-                  <div key={broker.id} className="flex items-center justify-between p-4 bg-background rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{broker.icon}</span>
-                      <div>
-                        <p className="font-medium text-text">{broker.name}</p>
-                        {isConnected && (
-                          <p className="text-xs text-success flex items-center gap-1">
-                            <CheckCircle className="w-3 h-3" /> Connected
-                          </p>
+              <div className="pt-4 border-t border-border">
+                <p className="text-xs font-semibold text-textMuted uppercase tracking-wider mb-4">Other Brokers</p>
+                <div className="space-y-3">
+                  {brokers.map((broker) => {
+                    const isConnected = settings.brokers[broker.id as keyof typeof settings.brokers]?.is_connected
+
+                    return (
+                      <div key={broker.id} className="flex items-center justify-between p-4 bg-background rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{broker.icon}</span>
+                          <div>
+                            <p className="font-medium text-text">{broker.name}</p>
+                            {isConnected && (
+                              <p className="text-xs text-success flex items-center gap-1">
+                                <CheckCircle className="w-3 h-3" /> Connected
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        {isConnected ? (
+                          <div className="flex items-center gap-3">
+                            <Badge variant="success">Connected</Badge>
+                            {settings.brokers[broker.id as keyof typeof settings.brokers]?.testnet_enabled && (
+                              <Badge variant="primary" size="sm">Testnet</Badge>
+                            )}
+                            <Button variant="ghost" size="sm">
+                              <Unlink className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <Button variant="outline" size="sm">
+                            <Link className="w-4 h-4 mr-2" />
+                            Connect
+                          </Button>
                         )}
                       </div>
-                    </div>
-                    {isConnected ? (
-                      <div className="flex items-center gap-3">
-                        <Badge variant="success">Connected</Badge>
-                        {settings.brokers[broker.id as keyof typeof settings.brokers]?.testnet_enabled && (
-                          <Badge variant="primary" size="sm">Testnet</Badge>
-                        )}
-                        <Button variant="ghost" size="sm">
-                          <Unlink className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button variant="outline" size="sm">
-                        <Link className="w-4 h-4 mr-2" />
-                        Connect
-                      </Button>
-                    )}
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </Card>
 
@@ -250,30 +273,6 @@ export function SettingsPage() {
                   { value: 'America/New_York', label: 'America/New_York (EST)' },
                 ]}
               />
-            </div>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Security</CardTitle>
-            </CardHeader>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Shield className="w-5 h-5 text-textMuted" />
-                  <div>
-                    <p className="font-medium text-text">Two-Factor Authentication</p>
-                    <p className="text-sm text-textMuted">Add an extra layer of security</p>
-                  </div>
-                </div>
-                <Badge variant={false ? 'success' : 'warning'}>
-                  {false ? 'Enabled' : 'Disabled'}
-                </Badge>
-              </div>
-              <Button variant="outline" className="w-full">
-                <Key className="w-4 h-4 mr-2" />
-                {false ? 'Disable 2FA' : 'Enable 2FA'}
-              </Button>
             </div>
           </Card>
         </div>

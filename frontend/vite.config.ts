@@ -2,7 +2,8 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
-const host = process.env.VITE_DEV_HOST || '0.0.0.0'
+const host = process.env.VITE_DEV_HOST || 'localhost'
+const isProduction = process.env.NODE_ENV === 'production'
 
 export default defineConfig({
   plugins: [react()],
@@ -15,8 +16,8 @@ export default defineConfig({
     port: 5173,
     host: host,
     strictPort: false,
-    hmr: {
-      host: host,
+    hmr: isProduction ? false : {
+      host: host === 'host.docker.internal' ? 'localhost' : host,
       port: 5173,
       protocol: 'ws',
       clientPort: 5173,
@@ -28,19 +29,15 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_API_TARGET || 'http://localhost:5000',
+        target: 'http://localhost:5000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, '/api'),
-        configure: (proxy, options) => {
-          proxy.on('proxyReq', (proxyReq) => {
-            proxyReq.setHeader('X-Forwarded-Host', 'localhost')
-          })
-        },
+        secure: false,
       },
       '/socket.io': {
-        target: process.env.VITE_WS_TARGET || 'http://localhost:5000',
+        target: 'http://localhost:5000',
         ws: true,
         changeOrigin: true,
+        secure: false,
       },
     },
     allowedHosts: ['localhost', 'host.docker.internal', '127.0.0.1'],

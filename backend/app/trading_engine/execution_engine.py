@@ -240,17 +240,39 @@ class ExecutionEngine:
         
         self.logger = logging.getLogger('execution_engine')
         
-        self._start_execution_loop()
+        self._execution_task = None
+        self._running = False
     
-    def _start_execution_loop(self) -> None:
-        asyncio.create_task(self._execution_loop())
+    async def start(self) -> None:
+        """Start the execution engine loop."""
+        if self._running:
+            return
+            
+        self._running = True
+        self._execution_task = asyncio.create_task(self._execution_loop())
+        self.logger.info("Execution engine started")
+    
+    async def stop(self) -> None:
+        """Stop the execution engine loop."""
+        self._running = False
+        
+        if self._execution_task:
+            self._execution_task.cancel()
+            try:
+                await self._execution_task
+            except asyncio.CancelledError:
+                pass
+            self._execution_task = None
+        self.logger.info("Execution engine stopped")
     
     async def _execution_loop(self) -> None:
-        while True:
+        while self._running:
             try:
                 order = await self.execution_queue.get()
                 if order:
                     await self._process_order(order)
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 self.logger.error(f"Execution loop error: {e}")
             await asyncio.sleep(0.05)
@@ -344,8 +366,14 @@ class ExecutionEngine:
         return self.execution_queue.size()
 
 
-execution_engine = ExecutionEngine()
+_execution_engine = None
 
 
 def get_execution_engine() -> ExecutionEngine:
-    return execution_engine
+    """Lazy singleton factory for ExecutionEngine."""
+    global _execution_engine
+
+    if _execution_engine is None:
+        _execution_engine = ExecutionEngine()
+
+    return _execution_engine

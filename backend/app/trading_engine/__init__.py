@@ -153,7 +153,7 @@ def init_trading_engine():
     return engine
 
 
-def get_trading_engine_status() -> Dict:
+def get_trading_engine_status() -> dict:
     """Get status of all trading engine components."""
     engine = get_trading_engine()
     return {

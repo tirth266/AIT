@@ -9,7 +9,11 @@ import logging
 import json
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Set, Any, Callable
-from flask_socketio import emit, join, leave, disconnect
+from flask_socketio import emit, disconnect
+try:
+    from flask_socketio import join_room as join, leave_room as leave
+except ImportError:
+    from flask_socketio import join, leave
 from flask import request
 import jwt
 from functools import wraps

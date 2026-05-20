@@ -4,42 +4,43 @@
  * Live positions with real-time P&L updates.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { TrendingUp, TrendingDown, X, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useTradingStore, useAuthStore } from '../../store'
+import { useShallow } from 'zustand/react/shallow'
+import { useTradingEngineStore } from '../../store'
 
 interface PositionItemProps {
   position: {
-    _id: string
     position_id?: string
     symbol: string
-    side: 'BUY' | 'SELL'
+    side?: 'BUY' | 'SELL'
     quantity: number
-    entry_price: number
+    entry_price?: number
     current_price: number
-    unrealized_pnl: number
-    unrealized_pnl_percent: number
+    unrealized_pnl?: number
+    unrealized_pnl_percent?: number
     mode?: 'paper' | 'live'
   }
   onExit: (positionId: string) => void
 }
 
-function PositionCard({ position, onExit }: PositionItemProps) {
+const PositionCard = React.memo(({ position, onExit }: PositionItemProps) => {
   const [flash, setFlash] = useState<'up' | 'down' | null>(null)
   const [isExpanded, setIsExpanded] = useState(false)
-  const [prevPnl, setPrevPnl] = useState(position.unrealized_pnl)
+  const [prevPnl, setPrevPnl] = useState(position.unrealized_pnl ?? 0)
 
   const isBuy = position.side === 'BUY'
-  const isPositive = position.unrealized_pnl >= 0
+  const isPositive = (position.unrealized_pnl ?? 0) >= 0
 
   useEffect(() => {
-    if (position.unrealized_pnl !== prevPnl) {
-      const direction = position.unrealized_pnl > prevPnl ? 'up' : 'down'
+    const currentPnl = position.unrealized_pnl ?? 0
+    if (currentPnl !== prevPnl) {
+      const direction = currentPnl > prevPnl ? 'up' : 'down'
       setFlash(direction)
       setTimeout(() => setFlash(null), 600)
-      setPrevPnl(position.unrealized_pnl)
+      setPrevPnl(currentPnl)
     }
   }, [position.unrealized_pnl, prevPnl])
 
@@ -71,7 +72,7 @@ function PositionCard({ position, onExit }: PositionItemProps) {
           <div>
             <p className="font-medium text-white">{position.symbol}</p>
             <p className="text-xs text-[#8B949E]">
-              {position.quantity} @ ₹{position.entry_price.toFixed(2)}
+              {position.quantity} @ ₹{(position.entry_price ?? 0).toFixed(2)}
             </p>
           </div>
         </div>
@@ -89,9 +90,9 @@ function PositionCard({ position, onExit }: PositionItemProps) {
                 isPositive ? 'text-[#3FB950]' : 'text-[#F85149]'
               )}
             >
-              {isPositive ? '+' : ''}₹{position.unrealized_pnl.toFixed(2)}
+              {isPositive ? '+' : ''}₹{(position.unrealized_pnl ?? 0).toFixed(2)}
               <span className="text-xs ml-1">
-                ({position.unrealized_pnl_percent >= 0 ? '+' : ''}{position.unrealized_pnl_percent.toFixed(2)}%)
+                ({(position.unrealized_pnl_percent ?? 0) >= 0 ? '+' : ''}{(position.unrealized_pnl_percent ?? 0).toFixed(2)}%)
               </span>
             </motion.p>
           </div>
@@ -99,7 +100,7 @@ function PositionCard({ position, onExit }: PositionItemProps) {
           <button
             onClick={(e) => {
               e.stopPropagation()
-              onExit(position._id || position.position_id || '')
+              onExit(position.position_id || '')
             }}
             className="p-1.5 bg-[#F85149]/10 hover:bg-[#F85149]/20 text-[#F85149] rounded-lg transition-colors"
           >
@@ -129,7 +130,7 @@ function PositionCard({ position, onExit }: PositionItemProps) {
               </div>
               <div>
                 <p className="text-[#8B949E] text-xs mb-1">Entry Value</p>
-                <p className="text-white font-medium">₹{(position.quantity * position.entry_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                <p className="text-white font-medium">₹{(position.quantity * (position.entry_price ?? 0)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
               </div>
               <div>
                 <p className="text-[#8B949E] text-xs mb-1">Quantity</p>
@@ -141,7 +142,7 @@ function PositionCard({ position, onExit }: PositionItemProps) {
                   'px-2 py-0.5 text-xs rounded-full',
                   position.mode === 'live' ? 'bg-[#F85149]/20 text-[#F85149]' : 'bg-[#8B949E]/20 text-[#8B949E]'
                 )}>
-                  {position.mode?.toUpperCase() || 'PAPER'}
+                  {typeof position.mode === 'string' ? position.mode.toUpperCase() : 'PAPER'}
                 </span>
               </div>
             </div>
@@ -150,24 +151,32 @@ function PositionCard({ position, onExit }: PositionItemProps) {
       </AnimatePresence>
     </motion.div>
   )
-}
+})
 
 interface RealtimePositionsProps {
   className?: string
 }
 
 export function RealtimePositions({ className }: RealtimePositionsProps) {
-  const { positions, exitPosition, fetchOpenPositions } = useTradingStore()
-  const { mode } = useAuthStore()
+  const positions = useTradingEngineStore(useShallow(state => state.positions))
+  const mode = useTradingEngineStore(state => state.mode)
+  const exitPosition = useTradingEngineStore(state => state.exitPosition)
+  const fetchOpenPositions = useTradingEngineStore(state => state.fetchOpenPositions)
 
   useEffect(() => {
     fetchOpenPositions()
   }, [fetchOpenPositions])
 
-  const totalUnrealizedPnl = positions.reduce((sum, p) => sum + p.unrealized_pnl, 0)
-  const totalValue = positions.reduce((sum, p) => sum + (p.quantity * p.current_price), 0)
-  const winningPositions = positions.filter(p => p.unrealized_pnl >= 0).length
-  const winRate = positions.length > 0 ? (winningPositions / positions.length) * 100 : 0
+  const metrics = useMemo(() => {
+    const totalUnrealizedPnl = positions.reduce((sum, p) => sum + (p.unrealized_pnl ?? 0), 0)
+    const totalValue = positions.reduce((sum, p) => sum + (p.quantity * p.current_price), 0)
+    const winningPositions = positions.filter(p => (p.unrealized_pnl ?? 0) >= 0).length
+    const winRate = positions.length > 0 ? (winningPositions / positions.length) * 100 : 0
+
+    return { totalUnrealizedPnl, totalValue, winRate }
+  }, [positions])
+
+  const { totalUnrealizedPnl, totalValue, winRate } = metrics
 
   const handleExit = useCallback(async (positionId: string) => {
     try {
@@ -206,7 +215,7 @@ export function RealtimePositions({ className }: RealtimePositionsProps) {
           <AnimatePresence>
             {positions.map((position) => (
               <PositionCard
-                key={position._id || position.position_id}
+                key={position.position_id || Math.random().toString()}
                 position={position}
                 onExit={handleExit}
               />
@@ -230,7 +239,7 @@ export function RealtimePositions({ className }: RealtimePositionsProps) {
             'text-sm font-medium',
             mode === 'live' ? 'text-[#F85149]' : 'text-[#8B949E]'
           )}>
-            {mode.toUpperCase()}
+            {typeof mode === 'string' ? mode.toUpperCase() : 'PAPER'}
           </span>
         </div>
       </div>

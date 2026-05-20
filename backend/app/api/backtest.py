@@ -8,7 +8,6 @@ import logging
 from bson import ObjectId
 from datetime import datetime
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 
@@ -18,7 +17,6 @@ bp = Blueprint('backtest', __name__)
 
 
 @bp.route('/run', methods=['POST'])
-@jwt_required()
 def run_backtest():
     """
     Start a backtest.
@@ -104,7 +102,6 @@ def run_backtest():
 
 
 @bp.route('/<backtest_id>', methods=['GET'])
-@jwt_required()
 def get_backtest_status(backtest_id):
     """
     Get backtest status and progress.
@@ -148,7 +145,6 @@ def get_backtest_status(backtest_id):
 
 
 @bp.route('/<backtest_id>/results', methods=['GET'])
-@jwt_required()
 def get_backtest_results(backtest_id):
     """
     Get backtest results.
@@ -215,7 +211,6 @@ def get_backtest_results(backtest_id):
 
 
 @bp.route('/history', methods=['GET'])
-@jwt_required()
 def list_backtests():
     """
     List backtest history.
@@ -261,7 +256,6 @@ def list_backtests():
 
 
 @bp.route('/<backtest_id>', methods=['DELETE'])
-@jwt_required()
 def delete_backtest(backtest_id):
     """
     Delete a backtest.

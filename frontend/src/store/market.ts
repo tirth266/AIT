@@ -2,6 +2,14 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { marketApi, dashboardApi } from '../services/api'
 import { socketService } from '../services/websocket'
+import { 
+  normalizeTick, 
+  normalizeTicks, 
+  normalizeSymbol, 
+  safeNumber, 
+  safeTimestamp,
+  safeString 
+} from '../utils/normalization'
 
 export interface TickData {
   symbol: string
@@ -106,6 +114,35 @@ export interface Quote {
   timestamp: string
 }
 
+export const DEFAULT_MARKET_STATUS: MarketStatus = {
+  exchange: 'NSE',
+  status: 'CLOSED',
+  session: 'CLOSED',
+  next_session: '',
+  closes_in_seconds: 0,
+  timestamp: new Date(0).toISOString(),
+};
+
+export const normalizeMarketStatus = (raw: any): MarketStatus => {
+  return {
+    exchange: safeString(raw?.exchange, 'NSE'),
+    status: (raw?.status || 'CLOSED').toUpperCase() as any,
+    session: (raw?.session || 'CLOSED').toUpperCase() as any,
+    next_session: safeString(raw?.next_session),
+    closes_in_seconds: safeNumber(raw?.closes_in_seconds),
+    timestamp: safeTimestamp(raw?.timestamp),
+  };
+};
+
+export const normalizeIndexData = (raw: any): IndexData => {
+  return {
+    symbol: normalizeSymbol(raw?.symbol),
+    value: safeNumber(raw?.value),
+    change: safeNumber(raw?.change),
+    change_percent: safeNumber(raw?.change_percent),
+  };
+};
+
 interface MarketState {
   quotes: Record<string, TickData>
   prices: Record<string, { price: number; change_percent_24h: number }>
@@ -113,7 +150,7 @@ interface MarketState {
   currentCandles: Record<string, Candle>
   depth: Record<string, MarketDepth>
   indicators: Record<string, IndicatorData>
-  marketStatus: MarketStatus | null
+  marketStatus: MarketStatus
   indices: IndexData[]
   topGainers: TickData[]
   topLosers: TickData[]
@@ -123,7 +160,7 @@ interface MarketState {
   isLoading: boolean
   isInitialized: boolean
   error: string | null
-  lastUpdated: string | null
+  lastUpdated: string
 
   initializeMarketData: () => Promise<void>
   subscribeToSymbol: (symbol: string) => void
@@ -135,6 +172,7 @@ interface MarketState {
   fetchMarketStatus: () => Promise<void>
   fetchMarketOverview: () => Promise<void>
   updateTick: (tick: TickData) => void
+  updateBatchedTicks: (ticks: TickData[]) => void
   updateDepth: (depth: MarketDepth) => void
   updateIndicators: (indicators: IndicatorData) => void
   updateCandle: (candle: Candle) => void
@@ -154,7 +192,7 @@ const initialState = {
   currentCandles: {} as Record<string, Candle>,
   depth: {} as Record<string, MarketDepth>,
   indicators: {} as Record<string, IndicatorData>,
-  marketStatus: null as MarketStatus | null,
+  marketStatus: DEFAULT_MARKET_STATUS,
   indices: [] as IndexData[],
   topGainers: [] as TickData[],
   topLosers: [] as TickData[],
@@ -164,7 +202,7 @@ const initialState = {
   isLoading: false,
   isInitialized: false,
   error: null as string | null,
-  lastUpdated: null as string | null,
+  lastUpdated: new Date(0).toISOString(),
 }
 
 export const useMarketStore = create<MarketState>()(
@@ -173,19 +211,19 @@ export const useMarketStore = create<MarketState>()(
       ...initialState,
 
       initializeMarketData: async () => {
-        if (get().isInitialized && get().lastUpdated) return
+        if (get().isInitialized && get().lastUpdated !== new Date(0).toISOString()) return
         
         set({ isLoading: true, error: null })
         try {
           const status = await marketApi.getMarketStatus()
-          set({ marketStatus: status.data.data })
+          set({ marketStatus: normalizeMarketStatus(status.data.data) })
           
           const overview = await marketApi.getMarketOverview()
           const data = overview.data.data
           set({ 
-            indices: data?.indices ?? [],
-            topGainers: data?.top_gainers ?? [],
-            topLosers: data?.top_losers ?? []
+            indices: Array.isArray(data?.indices) ? data.indices.map(normalizeIndexData) : [],
+            topGainers: Array.isArray(data?.top_gainers) ? data.top_gainers.map(normalizeTick) : [],
+            topLosers: Array.isArray(data?.top_losers) ? data.top_losers.map(normalizeTick) : []
           })
           
           const watchlist = await marketApi.getWatchlist()
@@ -193,10 +231,11 @@ export const useMarketStore = create<MarketState>()(
           const prices: Record<string, { price: number; change_percent_24h: number }> = {}
           
           if (Array.isArray(watchlist?.data?.data)) {
-            watchlist.data.data.forEach((tick: TickData) => {
-              if (tick?.symbol) {
-                quotes[tick.symbol] = tick
-                prices[tick.symbol] = { price: tick.ltp ?? 0, change_percent_24h: tick.change_percent ?? 0 }
+            watchlist.data.data.forEach((tick: any) => {
+              const normalized = normalizeTick(tick)
+              if (normalized?.symbol) {
+                quotes[normalized.symbol] = normalized as any
+                prices[normalized.symbol] = { price: normalized.last_price || 0, change_percent_24h: normalized.change_percent || 0 }
               }
             })
           }
@@ -220,18 +259,20 @@ export const useMarketStore = create<MarketState>()(
 
       subscribeToSymbol: (symbol: string) => {
         const { subscribedSymbols } = get()
-        if (subscribedSymbols.includes(symbol)) return
+        const normalizedSymbol = normalizeSymbol(symbol)
+        if (subscribedSymbols.includes(normalizedSymbol)) return
         
-        socketService.emit('subscribe_market', { symbols: [symbol], channel: 'quotes' })
-        set({ subscribedSymbols: [...subscribedSymbols, symbol] })
+        socketService.emit('subscribe_market', { symbols: [normalizedSymbol], channel: 'quotes' })
+        set({ subscribedSymbols: [...subscribedSymbols, normalizedSymbol] })
       },
 
       unsubscribeFromSymbol: (symbol: string) => {
         const { subscribedSymbols } = get()
-        if (!subscribedSymbols.includes(symbol)) return
+        const normalizedSymbol = normalizeSymbol(symbol)
+        if (!subscribedSymbols.includes(normalizedSymbol)) return
         
-        socketService.emit('unsubscribe_market', { symbols: [symbol] })
-        set({ subscribedSymbols: subscribedSymbols.filter(s => s !== symbol) })
+        socketService.emit('unsubscribe_market', { symbols: [normalizedSymbol] })
+        set({ subscribedSymbols: subscribedSymbols.filter(s => s !== normalizedSymbol) })
       },
 
       fetchQuotes: async (symbols: string[]) => {
@@ -243,12 +284,13 @@ export const useMarketStore = create<MarketState>()(
           const newPrices: Record<string, { price: number; change_percent_24h: number }> = {}
           
           if (Array.isArray(response?.data?.data)) {
-            response.data.data.forEach((quote: TickData) => {
-              if (quote?.symbol) {
-                newQuotes[quote.symbol] = quote
-                newPrices[quote.symbol] = { 
-                  price: quote.ltp ?? 0, 
-                  change_percent_24h: quote.change_percent ?? 0 
+            response.data.data.forEach((quote: any) => {
+              const normalized = normalizeTick(quote)
+              if (normalized?.symbol) {
+                newQuotes[normalized.symbol] = normalized as any
+                newPrices[normalized.symbol] = { 
+                  price: normalized.last_price || 0, 
+                  change_percent_24h: normalized.change_percent || 0 
                 }
               }
             })
@@ -272,7 +314,7 @@ export const useMarketStore = create<MarketState>()(
           const candleData = response?.data?.data?.candles
           if (candleData) {
             set((state) => ({
-              candles: { ...state.candles, [`${symbol}:${timeframe}`]: candleData },
+              candles: { ...state.candles, [`${normalizeSymbol(symbol)}:${timeframe}`]: candleData },
             }))
           }
           return candleData ?? null
@@ -305,7 +347,7 @@ export const useMarketStore = create<MarketState>()(
       fetchMarketStatus: async () => {
         try {
           const response = await marketApi.getMarketStatus()
-          set({ marketStatus: response?.data?.data })
+          set({ marketStatus: normalizeMarketStatus(response?.data?.data) })
         } catch (error) {
           console.error('Failed to fetch market status:', error)
         }
@@ -317,10 +359,10 @@ export const useMarketStore = create<MarketState>()(
           const response = await marketApi.getMarketOverview()
           const data = response?.data?.data
           set({ 
-            indices: data?.indices ?? [],
-            topGainers: data?.top_gainers ?? [],
-            topLosers: data?.top_losers ?? [],
-            marketStatus: data?.market_status,
+            indices: Array.isArray(data?.indices) ? data.indices.map(normalizeIndexData) : [],
+            topGainers: Array.isArray(data?.top_gainers) ? data.top_gainers.map(normalizeTick) : [],
+            topLosers: Array.isArray(data?.top_losers) ? data.top_losers.map(normalizeTick) : [],
+            marketStatus: normalizeMarketStatus(data?.market_status),
             isLoading: false 
           })
         } catch (error) {
@@ -330,16 +372,42 @@ export const useMarketStore = create<MarketState>()(
       },
 
       updateTick: (tick: TickData) => {
-        if (!tick?.symbol) return
+        const normalized = normalizeTick(tick)
+        if (!normalized?.symbol) return
         set((state) => {
           const newQuotes = { ...state.quotes }
-          newQuotes[tick.symbol] = tick
+          newQuotes[normalized.symbol] = normalized as any
           return { 
             quotes: newQuotes, 
             prices: {
               ...state.prices,
-              [tick.symbol]: { price: tick.ltp ?? 0, change_percent_24h: tick.change_percent ?? 0 }
+              [normalized.symbol]: { price: normalized.last_price || 0, change_percent_24h: normalized.change_percent || 0 }
             },
+            lastUpdated: new Date().toISOString() 
+          }
+        })
+      },
+
+      updateBatchedTicks: (ticks: TickData[]) => {
+        if (!Array.isArray(ticks) || ticks.length === 0) return
+        set((state) => {
+          const newQuotes = { ...state.quotes }
+          const newPrices = { ...state.prices }
+          
+          ticks.forEach(tick => {
+            const normalized = normalizeTick(tick)
+            if (normalized?.symbol) {
+              newQuotes[normalized.symbol] = normalized as any
+              newPrices[normalized.symbol] = { 
+                price: normalized.last_price || 0, 
+                change_percent_24h: normalized.change_percent || 0 
+              }
+            }
+          })
+          
+          return { 
+            quotes: newQuotes, 
+            prices: newPrices, 
             lastUpdated: new Date().toISOString() 
           }
         })
@@ -348,34 +416,35 @@ export const useMarketStore = create<MarketState>()(
       updateDepth: (depth: MarketDepth) => {
         if (!depth?.symbol) return
         set((state) => ({
-          depth: { ...state.depth, [depth.symbol]: depth }
+          depth: { ...state.depth, [normalizeSymbol(depth.symbol)]: depth }
         }))
       },
 
       updateIndicators: (indicators: IndicatorData) => {
         if (!indicators?.symbol) return
         set((state) => ({
-          indicators: { ...state.indicators, [indicators.symbol]: indicators }
+          indicators: { ...state.indicators, [normalizeSymbol(indicators.symbol)]: indicators }
         }))
       },
 
       updateCandle: (candle: Candle) => {
         if (!candle?.symbol) return
         set((state) => ({
-          currentCandles: { ...state.currentCandles, [candle.symbol]: candle }
+          currentCandles: { ...state.currentCandles, [normalizeSymbol(candle.symbol)]: candle }
         }))
       },
 
       updatePrice: (symbol, price, change, changePercent) => {
         if (!symbol) return
-        const currentQuote = get().quotes[symbol]
+        const normSymbol = normalizeSymbol(symbol)
+        const currentQuote = get().quotes[normSymbol]
         if (currentQuote) {
           const newQuotes = { ...get().quotes }
-          newQuotes[symbol] = {
+          newQuotes[normSymbol] = {
             ...currentQuote,
-            ltp: price,
-            change,
-            change_percent: changePercent,
+            ltp: safeNumber(price),
+            change: safeNumber(change),
+            change_percent: safeNumber(changePercent),
             timestamp: new Date().toISOString(),
           }
           set({ quotes: newQuotes })
@@ -383,24 +452,26 @@ export const useMarketStore = create<MarketState>()(
         set((state) => ({
           prices: {
             ...state.prices,
-            [symbol]: { price, change_percent_24h: changePercent },
+            [normSymbol]: { price: safeNumber(price), change_percent_24h: safeNumber(changePercent) },
           },
           lastUpdated: new Date().toISOString()
         }))
       },
 
-      setSelectedSymbol: (symbol) => set({ selectedSymbol: symbol }),
+      setSelectedSymbol: (symbol) => set({ selectedSymbol: symbol ? normalizeSymbol(symbol) : null }),
 
       addToWatchlist: (symbol: string) => {
         const { watchlist } = get()
-        if (!watchlist.includes(symbol)) {
-          set({ watchlist: [...watchlist, symbol] })
+        const normalized = normalizeSymbol(symbol)
+        if (!watchlist.includes(normalized)) {
+          set({ watchlist: [...watchlist, normalized] })
         }
       },
 
       removeFromWatchlist: (symbol: string) => {
         const { watchlist } = get()
-        set({ watchlist: watchlist.filter(s => s !== symbol) })
+        const normalized = normalizeSymbol(symbol)
+        set({ watchlist: watchlist.filter(s => s !== normalized) })
       },
 
       clearError: () => set({ error: null }),

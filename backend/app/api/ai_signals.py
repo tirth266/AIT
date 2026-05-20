@@ -8,7 +8,6 @@ import logging
 from datetime import datetime, timedelta
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -18,7 +17,6 @@ bp = Blueprint('ai_signals', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_signals():
     """
     List AI signals with filtering options.
@@ -92,7 +90,6 @@ def list_signals():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def create_signal():
     """
     Create a new AI signal (typically from AI engine).
@@ -164,7 +161,6 @@ def create_signal():
 
 
 @bp.route('/<signal_id>', methods=['GET'])
-@jwt_required()
 def get_signal(signal_id):
     """
     Get a specific AI signal.
@@ -204,7 +200,6 @@ def get_signal(signal_id):
 
 
 @bp.route('/<signal_id>/execute', methods=['POST'])
-@jwt_required()
 def execute_signal(signal_id):
     """
     Execute an AI signal (convert to trade).
@@ -220,7 +215,7 @@ def execute_signal(signal_id):
         Execution result with trade details
     """
     data = request.get_json() or {}
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -318,7 +313,6 @@ def execute_signal(signal_id):
 
 
 @bp.route('/stats', methods=['GET'])
-@jwt_required()
 def get_signal_stats():
     """
     Get AI signal statistics.
@@ -384,7 +378,6 @@ def get_signal_stats():
 
 
 @bp.route('/batch', methods=['POST'])
-@jwt_required()
 def generate_batch_signals():
     """
     Generate batch signals for multiple symbols (AI engine endpoint).

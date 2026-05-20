@@ -8,7 +8,6 @@ import logging
 from bson import ObjectId
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 from app.strategy_engine.engine import get_strategy_engine, initialize_engine
@@ -22,7 +21,6 @@ bp = Blueprint('strategy_engine', __name__, url_prefix='/api/engine')
 
 
 @bp.route('/status', methods=['GET'])
-@jwt_required()
 def get_engine_status():
     """Get strategy engine status and metrics."""
     try:
@@ -43,7 +41,6 @@ def get_engine_status():
 
 
 @bp.route('/strategies/<strategy_id>/start', methods=['POST'])
-@jwt_required()
 def start_strategy(strategy_id):
     """Start a strategy."""
     try:
@@ -64,7 +61,6 @@ def start_strategy(strategy_id):
 
 
 @bp.route('/strategies/<strategy_id>/stop', methods=['POST'])
-@jwt_required()
 def stop_strategy(strategy_id):
     """Stop a strategy."""
     try:
@@ -85,11 +81,10 @@ def stop_strategy(strategy_id):
 
 
 @bp.route('/signals', methods=['GET'])
-@jwt_required()
 def get_signals():
     """Get generated signals."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
         limit = int(request.args.get('limit', 50))
 
         db = get_db()
@@ -113,7 +108,6 @@ def get_signals():
 
 
 @bp.route('/signals', methods=['POST'])
-@jwt_required()
 def generate_signal():
     """Generate a signal for a strategy."""
     try:
@@ -139,11 +133,11 @@ def generate_signal():
         indicators = IndicatorRegistry()
 
         candles = indicators.calculate_all([])
-        signal = await generator.generate(strategy, candles, strategy.get('symbol'))
+        signal = generator.generate(strategy, candles, strategy.get('symbol'))
 
         if signal:
             signal['strategy_id'] = strategy_id
-            signal['user_id'] = get_jwt_identity()
+            signal['user_id'] = "default_user"
             signal['timestamp'] = datetime.utcnow()
 
             db.strategy_signals.insert_one(signal)
@@ -158,7 +152,6 @@ def generate_signal():
 
 
 @bp.route('/backtest', methods=['POST'])
-@jwt_required()
 def run_backtest():
     """Run a backtest."""
     try:
@@ -224,7 +217,7 @@ def run_backtest():
 
         db.backtest_results.insert_one({
             'strategy_id': strategy_id,
-            'user_id': get_jwt_identity(),
+            'user_id': "default_user",
             'result': result_dict,
             'created_at': datetime.utcnow()
         })
@@ -237,11 +230,10 @@ def run_backtest():
 
 
 @bp.route('/paper-trading/portfolio', methods=['GET'])
-@jwt_required()
 def get_paper_portfolio():
     """Get paper trading portfolio."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
 
         paper_engine = get_paper_engine()
         portfolio = asyncio.run(paper_engine.get_portfolio(user_id))
@@ -260,11 +252,10 @@ def get_paper_portfolio():
 
 
 @bp.route('/paper-trading/trades', methods=['GET'])
-@jwt_required()
 def get_paper_trades():
     """Get paper trading trades."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
         status = request.args.get('status', 'all')
         limit = int(request.args.get('limit', 50))
 
@@ -283,11 +274,10 @@ def get_paper_trades():
 
 
 @bp.route('/paper-trading/performance', methods=['GET'])
-@jwt_required()
 def get_paper_performance():
     """Get paper trading performance."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
         days = int(request.args.get('days', 30))
 
         paper_engine = get_paper_engine()
@@ -301,11 +291,10 @@ def get_paper_performance():
 
 
 @bp.route('/paper-trading/reset', methods=['POST'])
-@jwt_required()
 def reset_paper_portfolio():
     """Reset paper trading portfolio."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
 
         paper_engine = get_paper_engine()
         success = asyncio.run(paper_engine.reset_portfolio(user_id))
@@ -321,7 +310,6 @@ def reset_paper_portfolio():
 
 
 @bp.route('/strategies/list', methods=['GET'])
-@jwt_required()
 def list_managed_strategies():
     """List strategies being managed by the engine."""
     try:
@@ -336,11 +324,10 @@ def list_managed_strategies():
 
 
 @bp.route('/risk/summary', methods=['GET'])
-@jwt_required()
 def get_risk_summary():
     """Get risk management summary."""
     try:
-        user_id = get_jwt_identity()
+        user_id = "default_user"
 
         from app.strategy_engine.risk_manager import RiskManager
         risk_manager = RiskManager()

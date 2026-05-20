@@ -10,7 +10,11 @@ import logging
 import time
 import asyncio
 from datetime import datetime, timezone
-from flask_socketio import emit, join, leave, disconnect
+from flask_socketio import emit, disconnect
+try:
+    from flask_socketio import join_room as join, leave_room as leave
+except ImportError:
+    from flask_socketio import join, leave
 from flask import request
 
 from app.websocket.scalable_socket_manager import (
@@ -35,8 +39,19 @@ class SocketEventHandlers:
         self._manager = None
 
     def register(self):
-        """Register all event handlers."""
-        self._manager = init_scalable_socket_manager(self.socketio, self.app)
+        """Register all event handlers with graceful Redis fallback."""
+        print("\n" + "="*60)
+        print("  WebSocket Initialization")
+        print("="*60)
+        
+        try:
+            self._manager = init_scalable_socket_manager(self.socketio, self.app)
+            print("[OK] Scalable socket manager initialized")
+        except Exception as e:
+            print(f"[WARN] Scalable mode failed: {e}")
+            print("[WARN] Falling back to basic socket mode")
+            logger.warning(f"Socket manager initialization failed: {e}")
+            self._manager = None
 
         self._register_connect_handlers()
         self._register_auth_handlers()
@@ -46,10 +61,13 @@ class SocketEventHandlers:
         self._register_monitoring_handlers()
         self._register_error_handlers()
 
+        print("[OK] Socket event handlers registered")
+        print("="*60 + "\n")
         logger.info("Scalable socket handlers registered")
 
     def _register_connect_handlers(self):
         """Connection lifecycle handlers."""
+        node_id = self._manager.node_id if self._manager else "local"
 
         @self.socketio.on('connect')
         def handle_connect():
@@ -61,13 +79,15 @@ class SocketEventHandlers:
             emit('connected', {
                 'status': 'connected',
                 'session_id': sid,
-                'node_id': self._manager.node_id,
+                'node_id': node_id,
                 'timestamp': datetime.now(timezone.utc).isoformat()
             })
 
         @self.socketio.on('disconnect')
         async def handle_disconnect():
             """Handle disconnection."""
+            if not self._manager:
+                return
             sid = request.sid
             await self._manager.unregister_connection(sid)
             logger.info(f"Disconnected: {sid}")
@@ -75,6 +95,8 @@ class SocketEventHandlers:
         @self.socketio.on('disconnect_request')
         def handle_disconnect_request():
             """Handle graceful disconnect request."""
+            if not self._manager:
+                return
             sid = request.sid
             asyncio.create_task(self._manager.unregister_connection(sid))
             emit('disconnected', {
@@ -364,17 +386,8 @@ class SocketEventHandlers:
         def error_handler(e):
             logger.error(f"SocketIO Error: {e}")
 
-        @self.socketio.on_error_connect()
-        def error_connect_handler(e):
-            logger.error(f"SocketIO Connection Error: {e}")
-
-        @self.socketio.on_error_disconnect()
-        def error_disconnect_handler(e):
-            logger.error(f"SocketIO Disconnect Error: {e}")
-
-        @self.socketio.on_default()
-        def default_handler(event, data):
-            logger.warning(f"Unhandled event: {event}")
+        # Removed invalid decorators like on_error_connect, on_error_disconnect, on_default
+        # which do not exist in standard Flask-SocketIO.
 
     def _calculate_latency(self, sid: str) -> float:
         """Calculate approximate latency for session."""

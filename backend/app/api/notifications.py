@@ -8,7 +8,6 @@ import logging
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -18,7 +17,6 @@ bp = Blueprint('notifications', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_notifications():
     """
     List notifications for the user.
@@ -33,7 +31,7 @@ def list_notifications():
     Returns:
         List of notifications
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     notification_type = request.args.get('type')
     is_read = request.args.get('is_read')
     priority = request.args.get('priority')
@@ -73,7 +71,6 @@ def list_notifications():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def create_notification():
     """
     Create a new notification.
@@ -90,7 +87,7 @@ def create_notification():
     Returns:
         Created notification details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     title = data.get('title')
@@ -128,7 +125,6 @@ def create_notification():
 
 
 @bp.route('/<notification_id>', methods=['GET'])
-@jwt_required()
 def get_notification(notification_id):
     """
     Get a specific notification.
@@ -136,7 +132,7 @@ def get_notification(notification_id):
     Returns:
         Notification details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -169,7 +165,6 @@ def get_notification(notification_id):
 
 
 @bp.route('/<notification_id>/read', methods=['POST'])
-@jwt_required()
 def mark_as_read(notification_id):
     """
     Mark a notification as read.
@@ -177,7 +172,7 @@ def mark_as_read(notification_id):
     Returns:
         Success message
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -209,7 +204,6 @@ def mark_as_read(notification_id):
 
 
 @bp.route('/read-all', methods=['POST'])
-@jwt_required()
 def mark_all_as_read():
     """
     Mark all notifications as read for the user.
@@ -217,7 +211,7 @@ def mark_all_as_read():
     Returns:
         Success message with count
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -240,7 +234,6 @@ def mark_all_as_read():
 
 
 @bp.route('/<notification_id>', methods=['DELETE'])
-@jwt_required()
 def delete_notification(notification_id):
     """
     Delete a notification.
@@ -248,7 +241,7 @@ def delete_notification(notification_id):
     Returns:
         Success message
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -279,7 +272,6 @@ def delete_notification(notification_id):
 
 
 @bp.route('/clear', methods=['DELETE'])
-@jwt_required()
 def clear_notifications():
     """
     Clear all read notifications or all notifications.
@@ -292,7 +284,7 @@ def clear_notifications():
     Returns:
         Success message with count
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
     clear_type = data.get('clear_type', 'read')
 
@@ -315,7 +307,6 @@ def clear_notifications():
 
 
 @bp.route('/unread-count', methods=['GET'])
-@jwt_required()
 def get_unread_count():
     """
     Get count of unread notifications.
@@ -323,7 +314,7 @@ def get_unread_count():
     Returns:
         Unread count
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:

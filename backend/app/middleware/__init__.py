@@ -18,4 +18,4 @@ def register_middleware(app: Flask) -> None:
     init_security(app)  # Security headers and request validation
     init_rate_limiting(app)
     init_request_logging(app)
-    print("✓ All middleware registered")
+    print("[OK] All middleware registered")

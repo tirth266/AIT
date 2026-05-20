@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 import {
@@ -7,11 +7,11 @@ import {
   TrendingDown,
   RefreshCw,
   History,
-  Target,
   AlertCircle,
   RotateCcw,
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useShallow } from 'zustand/react/shallow'
 import { Card, CardHeader, CardTitle, Button, Badge, Loader, Modal } from '../../components/ui'
 import { useEngineStore } from '../../store'
 
@@ -24,12 +24,18 @@ export function PaperTradingDashboard({ compact = false }: PaperTradingDashboard
     paperPortfolio,
     paperTrades,
     paperPerformance,
-    fetchPaperPortfolio,
-    fetchPaperTrades,
-    fetchPaperPerformance,
-    resetPaperPortfolio,
     isLoading,
-  } = useEngineStore()
+  } = useEngineStore(useShallow(state => ({
+    paperPortfolio: state.paperPortfolio,
+    paperTrades: state.paperTrades,
+    paperPerformance: state.paperPerformance,
+    isLoading: state.isLoading,
+  })))
+
+  const fetchPaperPortfolio = useEngineStore(state => state.fetchPaperPortfolio)
+  const fetchPaperTrades = useEngineStore(state => state.fetchPaperTrades)
+  const fetchPaperPerformance = useEngineStore(state => state.fetchPaperPerformance)
+  const resetPaperPortfolio = useEngineStore(state => state.resetPaperPortfolio)
 
   const [showResetModal, setShowResetModal] = useState(false)
 
@@ -37,7 +43,7 @@ export function PaperTradingDashboard({ compact = false }: PaperTradingDashboard
     fetchPaperPortfolio()
     fetchPaperTrades('all', 20)
     fetchPaperPerformance(30)
-  }, [])
+  }, [fetchPaperPortfolio, fetchPaperTrades, fetchPaperPerformance])
 
   const handleReset = async () => {
     await resetPaperPortfolio()
@@ -46,6 +52,14 @@ export function PaperTradingDashboard({ compact = false }: PaperTradingDashboard
     fetchPaperTrades('all', 20)
   }
 
+  const equityCurve = useMemo(() => paperPerformance ? [
+    { day: 1, value: paperPortfolio?.initial_capital || 100000 },
+    { day: 7, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.25) },
+    { day: 14, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.5) },
+    { day: 21, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.75) },
+    { day: 30, value: paperPortfolio?.cash || 100000 },
+  ] : [], [paperPerformance, paperPortfolio])
+
   if (isLoading && !paperPortfolio) {
     return (
       <Card className="p-6">
@@ -53,14 +67,6 @@ export function PaperTradingDashboard({ compact = false }: PaperTradingDashboard
       </Card>
     )
   }
-
-  const equityCurve = paperPerformance ? [
-    { day: 1, value: paperPortfolio?.initial_capital || 100000 },
-    { day: 7, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.25) },
-    { day: 14, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.5) },
-    { day: 21, value: (paperPortfolio?.cash || 100000) * (1 + (paperPerformance.return_percent || 0) / 100 * 0.75) },
-    { day: 30, value: paperPortfolio?.cash || 100000 },
-  ] : []
 
   return (
     <div className="space-y-4">

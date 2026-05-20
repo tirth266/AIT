@@ -7,7 +7,6 @@ Bot control and status endpoints.
 import logging
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 
@@ -17,7 +16,6 @@ bp = Blueprint('bot', __name__)
 
 
 @bp.route('/start', methods=['POST'])
-@jwt_required()
 def start_bot():
     """
     Start a trading bot.
@@ -79,7 +77,6 @@ def start_bot():
 
 
 @bp.route('/stop', methods=['POST'])
-@jwt_required()
 def stop_bot():
     """
     Stop a trading bot.
@@ -137,7 +134,6 @@ def stop_bot():
 
 
 @bp.route('/status', methods=['GET'])
-@jwt_required()
 def get_bot_status():
     """
     Get status of all bots.
@@ -181,7 +177,6 @@ def get_bot_status():
 
 
 @bp.route('/mode', methods=['POST'])
-@jwt_required()
 def switch_mode():
     """
     Switch between paper and live trading mode.
@@ -222,7 +217,6 @@ def switch_mode():
 
 
 @bp.route('/pause', methods=['POST'])
-@jwt_required()
 def pause_all_bots():
     """
     Pause all running bots (circuit breaker).
@@ -260,7 +254,6 @@ def pause_all_bots():
 
 
 @bp.route('/resume', methods=['POST'])
-@jwt_required()
 def resume_bots():
     """
     Resume paused bots.

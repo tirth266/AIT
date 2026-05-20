@@ -6,7 +6,6 @@ User settings and preferences endpoints.
 
 import logging
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 from app.utils.encryption import encrypt_value, decrypt_value
@@ -17,7 +16,6 @@ bp = Blueprint('settings', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def get_settings():
     """
     Get all settings.
@@ -40,7 +38,6 @@ def get_settings():
 
 
 @bp.route('/<key>', methods=['GET'])
-@jwt_required()
 def get_setting(key):
     """
     Get a specific setting.
@@ -72,7 +69,6 @@ def get_setting(key):
 
 
 @bp.route('', methods=['PUT'])
-@jwt_required()
 def update_settings():
     """
     Update multiple settings.
@@ -128,7 +124,6 @@ def update_settings():
 
 
 @bp.route('/<key>', methods=['PUT'])
-@jwt_required()
 def update_setting(key):
     """
     Update a specific setting.
@@ -180,7 +175,6 @@ def update_setting(key):
 
 
 @bp.route('/reset-paper-balance', methods=['POST'])
-@jwt_required()
 def reset_paper_balance():
     """
     Reset paper trading balance.
@@ -218,7 +212,6 @@ def reset_paper_balance():
 
 
 @bp.route('/risk', methods=['GET'])
-@jwt_required()
 def get_risk_settings():
     """
     Get risk management settings.
@@ -252,7 +245,6 @@ def get_risk_settings():
 
 
 @bp.route('/risk', methods=['PUT'])
-@jwt_required()
 def update_risk_settings():
     """
     Update risk management settings.

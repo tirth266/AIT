@@ -14,7 +14,11 @@ import threading
 from typing import Dict, List, Optional, Set, Any, Callable
 from datetime import datetime, timezone
 
-from flask_socketio import emit, join, leave, disconnect
+from flask_socketio import emit, disconnect
+try:
+    from flask_socketio import join_room as join, leave_room as leave
+except ImportError:
+    from flask_socketio import join, leave
 from flask import request, Flask
 import jwt
 import zlib
@@ -97,10 +101,15 @@ class ScalableSocketManager:
 
     def initialize(self):
         """Initialize the scalable socket manager."""
-        self._setup_pubsub_handlers()
+        try:
+            self._setup_pubsub_handlers()
+        except Exception as e:
+            logger.warning(f"[WARN] Pub/Sub handlers setup failed: {e}")
+            logger.warning(f"[WARN] WebSocket will operate in local mode")
+        
         self._setup_connection_callbacks()
         self._running = True
-        logger.info(f"Scalable socket manager initialized for node {self.node_id}")
+        logger.info(f"[OK] WebSocket manager initialized for node {self.node_id}")
 
     def _setup_pubsub_handlers(self):
         """Setup Redis Pub/Sub message handlers."""

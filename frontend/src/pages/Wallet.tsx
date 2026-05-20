@@ -10,11 +10,11 @@ import {
   Building,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useAuthStore } from '../store'
+import { useTradingStore } from '../store'
 import { Card, CardHeader, CardTitle, Button, Badge } from '../components/ui'
 
 export function WalletPage() {
-  const { mode } = useAuthStore()
+  const { mode } = useTradingStore()
 
   const paperBalance = {
     total: 10250.00,

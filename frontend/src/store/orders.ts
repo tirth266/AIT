@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import { ordersApi } from '../services/api'
 import type { Order, CreateOrderRequest } from '../types'
+import { normalizeOrder, normalizeOrders, safeNumber } from '../utils/normalization'
+
+export const DEFAULT_PAGINATION = {
+  page: 1,
+  limit: 50,
+  total: 0,
+  pages: 0,
+};
 
 interface OrdersState {
   orders: Order[]
@@ -32,15 +40,21 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
   isLoading: false,
   isSubmitting: false,
   error: null,
-  pagination: { page: 1, limit: 50, total: 0, pages: 0 },
+  pagination: DEFAULT_PAGINATION,
 
   fetchOrders: async (params = {}) => {
     set({ isLoading: true, error: null })
     try {
       const response = await ordersApi.list(params)
+      const rawPagination = response.data.pagination;
       set({
-        orders: response.data.data,
-        pagination: response.data.pagination || { page: 1, limit: 50, total: 0, pages: 0 },
+        orders: normalizeOrders(response.data.data),
+        pagination: {
+          page: safeNumber(rawPagination?.page, 1),
+          limit: safeNumber(rawPagination?.limit, 50),
+          total: safeNumber(rawPagination?.total, 0),
+          pages: safeNumber(rawPagination?.pages, 0),
+        } || DEFAULT_PAGINATION,
         isLoading: false,
       })
     } catch (error) {
@@ -53,7 +67,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     set({ isLoading: true })
     try {
       const response = await ordersApi.get(id)
-      set({ selectedOrder: response.data.data, isLoading: false })
+      set({ selectedOrder: normalizeOrder(response.data.data), isLoading: false })
     } catch (error) {
       console.error('Failed to fetch order:', error)
       set({ error: 'Failed to fetch order details', isLoading: false })
@@ -64,7 +78,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     set({ isSubmitting: true, error: null })
     try {
       const response = await ordersApi.create(orderData)
-      const newOrder = response.data.data
+      const newOrder = normalizeOrder(response.data.data)
       set((state) => ({
         orders: [newOrder, ...state.orders],
         isSubmitting: false,
@@ -115,7 +129,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
     set({ isLoading: true })
     try {
       const response = await ordersApi.history(params)
-      set({ orders: response.data.data, isLoading: false })
+      set({ orders: normalizeOrders(response.data.data), isLoading: false })
     } catch (error) {
       console.error('Failed to fetch order history:', error)
       set({ error: 'Failed to fetch order history', isLoading: false })
@@ -123,13 +137,14 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
   },
 
   updateOrderFromWS: (order) => {
+    const normalizedOrder = normalizeOrder(order)
     set((state) => ({
-      orders: state.orders.map((o) => (o.order_id === order.order_id ? order : o)),
-      selectedOrder: state.selectedOrder?.order_id === order.order_id ? order : state.selectedOrder,
+      orders: state.orders.map((o) => (o.order_id === normalizedOrder.order_id ? normalizedOrder : o)),
+      selectedOrder: state.selectedOrder?.order_id === normalizedOrder.order_id ? normalizedOrder : state.selectedOrder,
     }))
   },
 
-  setSelectedOrder: (order) => set({ selectedOrder: order }),
+  setSelectedOrder: (order) => set({ selectedOrder: order ? normalizeOrder(order) : null }),
 
   clearError: () => set({ error: null }),
 }))

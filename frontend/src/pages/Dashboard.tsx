@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar } from 'recharts'
 import {
@@ -14,12 +14,34 @@ import {
   LineChart,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useAuthStore, useTradingStore, useMarketStore, useDashboardStore, useFundsStore, useWatchlistStore } from '../store'
+import { useShallow } from 'zustand/react/shallow'
+import { 
+  useTradingStore, 
+  useMarketStore, 
+  useDashboardStore, 
+  useFundsStore, 
+  useWatchlistStore 
+} from '../store'
 import { Card, CardHeader, CardTitle, Badge, StatusBadge, Button } from '../components/ui'
-import { RealtimeWatchlist, RealtimePositions, AISignalsWidget, NotificationCenter } from '../components/widgets'
-import { mockDashboardData, mockPositions, mockBots, mockTrades, mockWatchlist, mockOrders, mockIndices } from '../services/mockData'
+import { RealtimeWatchlist, RealtimePositions, AISignalsWidget } from '../components/widgets'
+import { 
+  mockDashboardData, 
+  mockPositions, 
+  mockBots, 
+  mockTrades, 
+  mockWatchlist, 
+  mockOrders, 
+  mockIndices 
+} from '../services/mockData'
 import type { Bot as BotType } from '../store/trading'
-import { useRealtimeConnection, useRealtimeMarketData, useRealtimePositions, useRealtimeNotifications, useRealtimeAISignals } from '../hooks'
+import { 
+  useRealtimeConnection, 
+  useRealtimeMarketData, 
+  useRealtimePositions, 
+  useRealtimeNotifications, 
+  useRealtimeAISignals 
+} from '../hooks'
+import { useAngelOne } from '../broker/angelone'
 
 const chartColors = {
   primary: '#238636',
@@ -38,7 +60,7 @@ interface StatCardProps {
   delay: number
 }
 
-function StatCard({ title, value, change, changeType, icon: Icon, delay }: StatCardProps) {
+const StatCard = React.memo(({ title, value, change, changeType, icon: Icon, delay }: StatCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -69,13 +91,13 @@ function StatCard({ title, value, change, changeType, icon: Icon, delay }: StatC
       </Card>
     </motion.div>
   )
-}
+})
 
 interface PositionItemProps {
   position: typeof mockPositions[0]
 }
 
-function PositionItem({ position }: PositionItemProps) {
+const PositionItem = React.memo(({ position }: PositionItemProps) => {
   const isPositive = position.unrealized_pnl >= 0
   
   return (
@@ -100,13 +122,13 @@ function PositionItem({ position }: PositionItemProps) {
       </div>
     </div>
   )
-}
+})
 
 interface BotItemProps {
   bot: BotType
 }
 
-function BotItem({ bot }: BotItemProps) {
+const BotItem = React.memo(({ bot }: BotItemProps) => {
   return (
     <div className="flex items-center justify-between py-3 border-b border-[#21262D] last:border-0">
       <div className="flex items-center gap-3">
@@ -126,13 +148,13 @@ function BotItem({ bot }: BotItemProps) {
       </div>
     </div>
   )
-}
+})
 
 interface OrderItemProps {
   order: typeof mockOrders[0]
 }
 
-function OrderItem({ order }: OrderItemProps) {
+const OrderItem = React.memo(({ order }: OrderItemProps) => {
   const isBuy = order.side === 'BUY'
   const statusColors: Record<string, string> = {
     COMPLETED: 'bg-[#238636]/20 text-[#3FB950]',
@@ -167,13 +189,13 @@ function OrderItem({ order }: OrderItemProps) {
       </div>
     </div>
   )
-}
+})
 
 interface TradeItemProps {
   trade: typeof mockTrades[0]
 }
 
-function TradeItem({ trade }: TradeItemProps) {
+const TradeItem = React.memo(({ trade }: TradeItemProps) => {
   const isPositive = (trade.pnl || 0) >= 0
   
   return (
@@ -205,35 +227,14 @@ function TradeItem({ trade }: TradeItemProps) {
       </div>
     </div>
   )
-}
-
-interface WatchlistItemProps {
-  item: typeof mockWatchlist[0]
-}
-
-function WatchlistItem({ item }: WatchlistItemProps) {
-  return (
-    <div className="flex items-center justify-between py-2 px-2 hover:bg-[#21262D]/50 rounded-lg transition-colors cursor-pointer">
-      <div>
-        <p className="font-medium text-white text-sm">{item.symbol}</p>
-        <p className="text-xs text-[#8B949E]">{item.name}</p>
-      </div>
-      <div className="text-right">
-        <p className="text-sm text-white">₹{item.price.toLocaleString()}</p>
-        <p className={clsx('text-xs', item.change >= 0 ? 'text-[#3FB950]' : 'text-[#F85149]')}>
-          {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
-        </p>
-      </div>
-    </div>
-  )
-}
+})
 
 interface IndexCardProps {
   name: string
   data: typeof mockIndices.NIFTY
 }
 
-function IndexCard({ name, data }: IndexCardProps) {
+const IndexCard = React.memo(({ name, data }: IndexCardProps) => {
   const isPositive = data.change >= 0
   return (
     <div className="p-3 bg-[#0D1117] rounded-lg border border-[#21262D]">
@@ -244,50 +245,70 @@ function IndexCard({ name, data }: IndexCardProps) {
       </p>
     </div>
   )
-}
+})
 
 export function DashboardPage() {
   const navigate = useNavigate()
-  const { mode, isAuthenticated } = useAuthStore()
-  const { positions, bots, trades } = useTradingStore()
-  const { quotes } = useMarketStore()
-  const { summary, performance, funds, isLoading, fetchSummary, fetchFunds, fetchPositions } = useDashboardStore()
-  const { watchlists, activeWatchlist, quotes: watchlistQuotes, fetchWatchlists } = useWatchlistStore()
+  const { isAuthenticated, refreshAll } = useAngelOne()
+  
+  // Granular store selectors
+  const mode = useTradingStore(state => state.mode)
+  const { positions, bots, trades } = useTradingStore(useShallow(state => ({
+    positions: state.positions,
+    bots: state.bots,
+    trades: state.trades,
+  })))
+  
+  const { summary, funds, isLoading } = useDashboardStore(useShallow(state => ({
+    summary: state.summary,
+    funds: state.funds,
+    isLoading: state.isLoading,
+  })))
+  const fetchSummary = useDashboardStore(state => state.fetchSummary)
+  const fetchFunds = useDashboardStore(state => state.fetchFunds)
+  const fetchPositions = useDashboardStore(state => state.fetchPositions)
+
+  const { activeWatchlist, watchlistQuotes } = useWatchlistStore(useShallow(state => ({
+    activeWatchlist: state.activeWatchlist,
+    watchlistQuotes: state.quotes,
+  })))
+  const fetchWatchlists = useWatchlistStore(state => state.fetchWatchlists)
 
   useRealtimeConnection()
   useRealtimeMarketData()
   useRealtimePositions()
   useRealtimeNotifications()
-  const { signals } = useRealtimeAISignals()
+  useRealtimeAISignals()
 
   const data = mockDashboardData
 
   useEffect(() => {
+    fetchSummary()
+    fetchFunds()
+    fetchPositions()
+    fetchWatchlists()
+    
     if (isAuthenticated) {
-      fetchSummary()
-      fetchFunds()
-      fetchPositions()
-      fetchWatchlists()
+      refreshAll()
     }
-  }, [isAuthenticated, fetchSummary, fetchFunds, fetchPositions, fetchWatchlists])
+  }, [fetchSummary, fetchFunds, fetchPositions, fetchWatchlists, isAuthenticated, refreshAll])
 
-  const modeData = funds?.balance.total_balance || data.account.paper_balance
+  const modeData = useMemo(() => funds?.balance.total_balance || data.account.paper_balance, [funds, data.account.paper_balance])
   const indices = mockIndices
 
-  const watchlistData = activeWatchlist?.symbols.map(symbol => {
-    const quote = watchlistQuotes.get(symbol)
+  const watchlistData = useMemo(() => activeWatchlist?.symbols.map(symbol => {
+    const quote = watchlistQuotes[symbol]
     return {
       symbol,
       price: quote?.last_price || 0,
       change: quote?.change_percent || 0,
       name: symbol
     }
-  }) || mockWatchlist
+  }) || mockWatchlist, [activeWatchlist, watchlistQuotes])
 
-  const displayPositions = positions.length > 0 ? positions : mockPositions
-  const displayBots = bots.length > 0 ? bots : mockBots
-  const displayTrades = trades.length > 0 ? trades.slice(0, 10) : mockTrades.slice(0, 10)
-  const displayOrders = mockOrders
+  const displayPositions = useMemo(() => positions.length > 0 ? positions : mockPositions, [positions])
+  const displayBots = useMemo(() => bots.length > 0 ? bots : mockBots, [bots])
+  const displayTrades = useMemo(() => trades.length > 0 ? trades.slice(0, 10) : mockTrades.slice(0, 10), [trades])
 
   return (
     <div className="space-y-6">
@@ -496,7 +517,7 @@ export function DashboardPage() {
               </Button>
             </CardHeader>
             <div className="space-y-0">
-              {mockTrades.slice(0, 5).map((trade) => (
+              {displayTrades.map((trade) => (
                 <TradeItem key={trade._id} trade={trade} />
               ))}
             </div>
@@ -556,3 +577,5 @@ export function DashboardPage() {
     </div>
   )
 }
+
+export default DashboardPage

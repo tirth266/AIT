@@ -1,4 +1,3 @@
-export { useAuthStore } from './auth'
 export { useTradingStore, type Position, type Trade, type Strategy, type Bot } from './trading'
 export { useTradingEngineStore } from './trading-engine'
 export { useMarketStore, type TickData, type Candle, type MarketDepth, type IndicatorData, type MarketStatus, type IndexData } from './market'

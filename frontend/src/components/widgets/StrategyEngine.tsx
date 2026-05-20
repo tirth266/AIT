@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity,
-  Play,
-  Pause,
   RefreshCw,
   TrendingUp,
   TrendingDown,
@@ -11,9 +9,9 @@ import {
   Zap,
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useShallow } from 'zustand/react/shallow'
 import { Card, CardHeader, CardTitle, Button, Badge, Loader } from '../../components/ui'
 import { useEngineStore, useStrategiesStore } from '../../store'
-import type { EngineStatus, StrategySignal } from '../../types'
 
 interface StrategyEngineProps {
   compact?: boolean
@@ -24,13 +22,23 @@ export function StrategyEngineDashboard({ compact = false }: StrategyEngineProps
     status,
     signals,
     riskSummary,
-    fetchEngineStatus,
-    fetchSignals,
-    fetchRiskSummary,
     isLoading,
-  } = useEngineStore()
+  } = useEngineStore(useShallow(state => ({
+    status: state.status,
+    signals: state.signals,
+    riskSummary: state.riskSummary,
+    isLoading: state.isLoading,
+  })))
 
-  const { strategies, fetchStrategies } = useStrategiesStore()
+  const fetchEngineStatus = useEngineStore(state => state.fetchEngineStatus)
+  const fetchSignals = useEngineStore(state => state.fetchSignals)
+  const fetchRiskSummary = useEngineStore(state => state.fetchRiskSummary)
+
+  const { strategies } = useStrategiesStore(useShallow(state => ({
+    strategies: state.strategies,
+  })))
+  const fetchStrategies = useStrategiesStore(state => state.fetchStrategies)
+
   const [activeTab, setActiveTab] = useState<'signals' | 'strategies' | 'risk'>('signals')
 
   useEffect(() => {
@@ -45,7 +53,7 @@ export function StrategyEngineDashboard({ compact = false }: StrategyEngineProps
     }, 10000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchEngineStatus, fetchSignals, fetchRiskSummary, fetchStrategies])
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -135,7 +143,7 @@ export function StrategyEngineDashboard({ compact = false }: StrategyEngineProps
               Signals
             </Button>
             <Button
-              variant={activeTab === 'strategies' ? 'primary' : 'ghost'}
+              variant={activeTab === 'primary' ? 'primary' : 'ghost'}
               size="sm"
               onClick={() => setActiveTab('strategies')}
             >
@@ -202,14 +210,14 @@ export function StrategyEngineDashboard({ compact = false }: StrategyEngineProps
                 <CardTitle>Running Strategies</CardTitle>
               </CardHeader>
               <div className="space-y-2 max-h-64 overflow-y-auto">
-                {strategies.filter(s => s.is_active).length > 0 ? (
-                  strategies.filter(s => s.is_active).map((strategy) => (
+                {strategies.filter(s => s.status === 'ACTIVE').length > 0 ? (
+                  strategies.filter(s => s.status === 'ACTIVE').map((strategy) => (
                     <div
-                      key={strategy._id}
+                      key={strategy.strategy_id}
                       className="flex items-center justify-between p-3 bg-background rounded-lg"
                     >
                       <div>
-                        <p className="font-medium text-text">{strategy.strategy_name}</p>
+                        <p className="font-medium text-text">{strategy.name}</p>
                         <p className="text-xs text-textMuted">
                           {strategy.symbol} • {strategy.timeframe}
                         </p>

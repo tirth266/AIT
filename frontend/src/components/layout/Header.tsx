@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Bell,
-  LogOut,
   ChevronDown,
   Wallet,
   TrendingUp,
@@ -11,7 +10,7 @@ import {
   Settings as SettingsIcon,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useAuthStore, useTradingStore, useMarketStore } from '../../store'
+import { useTradingStore, useMarketStore } from '../../store'
 import { ConnectionStatus } from '../ui/ConnectionStatus'
 
 interface HeaderProps {
@@ -30,10 +29,12 @@ const DEFAULT_WALLET_BALANCE = {
 
 export function Header({ unreadCount = 0 }: HeaderProps) {
   const navigate = useNavigate()
-  const { mode, setMode, logout, user } = useAuthStore()
+  const [mode, setMode] = useState<'paper' | 'live'>('paper')
   const positions = useTradingStore((state) => state.positions ?? [])
   const prices = useMarketStore((state) => state.prices ?? {})
   const [showDropdown, setShowDropdown] = useState(false)
+
+  const user = { full_name: 'Admin' }
 
   const totalUnrealizedPnL = useMemo(() => {
     if (!Array.isArray(positions)) return 0
@@ -56,11 +57,6 @@ export function Header({ unreadCount = 0 }: HeaderProps) {
   const walletBalance = mode === 'paper' 
     ? DEFAULT_WALLET_BALANCE.paper 
     : DEFAULT_WALLET_BALANCE.live
-
-  const handleLogout = () => {
-    logout()
-    navigate('/login')
-  }
 
   return (
     <header className="h-14 bg-[#0D1117]/80 backdrop-blur-lg border-b border-[#21262D] flex items-center justify-between px-4 sticky top-0 z-30">
@@ -145,10 +141,10 @@ export function Header({ unreadCount = 0 }: HeaderProps) {
           >
             <div className="w-7 h-7 rounded-md bg-gradient-to-br from-[#238636] to-[#2EA043] flex items-center justify-center">
               <span className="text-xs font-medium text-white">
-                {user?.full_name?.charAt(0) || 'U'}
+                {user?.full_name?.charAt(0) || 'A'}
               </span>
             </div>
-            <span className="text-sm text-white">{user?.full_name || 'User'}</span>
+            <span className="text-sm text-white">{user?.full_name || 'Admin'}</span>
             <ChevronDown className="w-3.5 h-3.5 text-[#8B949E]" />
           </button>
 
@@ -177,13 +173,6 @@ export function Header({ unreadCount = 0 }: HeaderProps) {
               >
                 <SettingsIcon className="w-4 h-4" />
                 Settings
-              </button>
-              <button
-                onClick={handleLogout}
-                className="w-full px-3 py-2 text-left text-sm text-[#F85149] hover:bg-[#21262D] flex items-center gap-2"
-              >
-                <LogOut className="w-4 h-4" />
-                Logout
               </button>
             </motion.div>
           )}

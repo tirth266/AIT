@@ -8,7 +8,6 @@ import logging
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -18,7 +17,6 @@ bp = Blueprint('watchlist', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_watchlists():
     """
     List all watchlists for the user.
@@ -26,7 +24,7 @@ def list_watchlists():
     Returns:
         List of watchlists with symbols
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -48,7 +46,6 @@ def list_watchlists():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def create_watchlist():
     """
     Create a new watchlist.
@@ -63,7 +60,7 @@ def create_watchlist():
     Returns:
         Created watchlist details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     name = data.get('name')
@@ -111,7 +108,6 @@ def create_watchlist():
 
 
 @bp.route('/<watchlist_id>', methods=['GET'])
-@jwt_required()
 def get_watchlist(watchlist_id):
     """
     Get a specific watchlist with symbol details.
@@ -119,7 +115,7 @@ def get_watchlist(watchlist_id):
     Returns:
         Watchlist details
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -152,7 +148,6 @@ def get_watchlist(watchlist_id):
 
 
 @bp.route('/<watchlist_id>', methods=['PUT'])
-@jwt_required()
 def update_watchlist(watchlist_id):
     """
     Update a watchlist.
@@ -167,7 +162,7 @@ def update_watchlist(watchlist_id):
     Returns:
         Success message
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     db = get_db()
@@ -204,7 +199,6 @@ def update_watchlist(watchlist_id):
 
 
 @bp.route('/<watchlist_id>', methods=['DELETE'])
-@jwt_required()
 def delete_watchlist(watchlist_id):
     """
     Delete a watchlist.
@@ -212,7 +206,7 @@ def delete_watchlist(watchlist_id):
     Returns:
         Success message
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
 
     db = get_db()
     if not db:
@@ -243,7 +237,6 @@ def delete_watchlist(watchlist_id):
 
 
 @bp.route('/<watchlist_id>/symbols', methods=['POST'])
-@jwt_required()
 def add_symbol(watchlist_id):
     """
     Add symbol to watchlist.
@@ -256,7 +249,7 @@ def add_symbol(watchlist_id):
     Returns:
         Updated watchlist
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     symbol = data.get('symbol', '').upper()
@@ -307,7 +300,6 @@ def add_symbol(watchlist_id):
 
 
 @bp.route('/<watchlist_id>/symbols/<symbol>', methods=['DELETE'])
-@jwt_required()
 def remove_symbol(watchlist_id, symbol):
     """
     Remove symbol from watchlist.
@@ -315,7 +307,7 @@ def remove_symbol(watchlist_id, symbol):
     Returns:
         Updated watchlist
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     symbol = symbol.upper()
 
     db = get_db()
@@ -352,7 +344,6 @@ def remove_symbol(watchlist_id, symbol):
 
 
 @bp.route('/reorder', methods=['POST'])
-@jwt_required()
 def reorder_watchlists():
     """
     Reorder watchlists (set default, sort order).
@@ -366,7 +357,7 @@ def reorder_watchlists():
     Returns:
         Success message
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     data = request.get_json() or {}
 
     watchlist_ids = data.get('watchlist_ids', [])

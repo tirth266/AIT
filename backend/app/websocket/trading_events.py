@@ -1,13 +1,18 @@
 """
 Trading WebSocket Events
-========================
+=======================
 WebSocket event handlers for trading engine updates.
 """
 
 import logging
 import asyncio
 from datetime import datetime, timezone
-from flask_socketio import emit, join, leave
+from flask import request
+from flask_socketio import emit
+try:
+    from flask_socketio import join_room as join, leave_room as leave
+except ImportError:
+    from flask_socketio import join, leave
 
 from app.trading_engine import (
     get_trading_engine,

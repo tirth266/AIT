@@ -1,0 +1,77 @@
+from pydantic import BaseModel
+from typing import Optional, List
+
+class PositionResponse(BaseModel):
+    symboltoken: str
+    symbolname: str
+    instrumenttype: str
+    priceden: float
+    pricenum: float
+    genden: float
+    gennum: float
+    precision: float
+    multiplier: float
+    boardlotsize: float
+    exchange: str
+    producttype: str
+    tradingsymbol: str
+    symbolgroup: str
+    strikeprice: str
+    optiontype: str
+    expirydate: str
+    lot: str
+    cfbuyqty: str
+    cfsellqty: str
+    cfbuyamount: str
+    cfsellamount: str
+    buyavgprice: str
+    sellavgprice: str
+    avgnetprice: str
+    netvalue: str
+    netqty: str
+    totalbuyvalue: str
+    totalsellvalue: str
+    cfbuyavgprice: str
+    cfsellavgprice: str
+    totalbuyavgprice: str
+    totalsellavgprice: str
+    netprice: str
+    buyqty: str
+    sellqty: str
+    buyamount: str
+    sellamount: str
+    pnl: str
+    realised: str
+    unrealised: str
+    mtm: str
+    close: str
+
+class HoldingResponse(BaseModel):
+    tradingsymbol: str
+    exchange: str
+    isin: str
+    t1quantity: int
+    realisedquantity: int
+    quantity: int
+    authorisedquantity: int
+    profitandloss: float
+    pnlpercentage: float
+    averageprice: float
+    collateralquantity: int
+    collateraltype: str
+    haircut: float
+
+class RMSResponse(BaseModel):
+    net: float
+    availablecash: float
+    availableintradaypayin: float
+    availablelimitmargin: float
+    collateral: float
+    m2munrealized: float
+    m2mrealized: float
+    utiliseddebits: float
+    utilisedspan: float
+    utilisedoptionpremium: float
+    utilisedholdingsales: float
+    utilisedturnover: float
+    utilisedpayout: float

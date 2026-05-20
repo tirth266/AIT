@@ -1,10 +1,43 @@
 import { create } from 'zustand'
 import { strategiesApi } from '../services/api'
 import type { Strategy, CreateStrategyRequest } from '../types'
+import { 
+  safeNumber, 
+  safeString, 
+  safeTimestamp, 
+  normalizeSymbol,
+  normalizeStrategy,
+  normalizeStrategies
+} from '../utils/normalization'
+
+export const DEFAULT_STRATEGY: Strategy = {
+  strategy_id: '',
+  name: '',
+  symbol: '',
+  exchange: 'NSE',
+  timeframe: '5m',
+  mode: 'PAPER',
+  status: 'PAUSED',
+  parameters: {},
+  risk_settings: {
+    max_position_size: 0,
+    stop_loss_percent: 0,
+    target_percent: 0,
+    max_daily_loss: 0,
+  },
+  created_at: new Date(0).toISOString(),
+};
+
+export const DEFAULT_PAGINATION = {
+  page: 1,
+  limit: 20,
+  total: 0,
+  pages: 0,
+};
 
 interface StrategiesState {
   strategies: Strategy[]
-  selectedStrategy: Strategy | null
+  selectedStrategy: Strategy
   isLoading: boolean
   isSubmitting: boolean
   error: string | null
@@ -23,25 +56,31 @@ interface StrategiesState {
   startStrategy: (id: string, mode?: string) => Promise<void>
   stopStrategy: (id: string) => Promise<void>
   updateStrategyFromWS: (strategy: { strategy_id: string; status: string }) => void
-  setSelectedStrategy: (strategy: Strategy | null) => void
+  setSelectedStrategy: (strategy: Strategy) => void
   clearError: () => void
 }
 
 export const useStrategiesStore = create<StrategiesState>((set, get) => ({
   strategies: [],
-  selectedStrategy: null,
+  selectedStrategy: DEFAULT_STRATEGY,
   isLoading: false,
   isSubmitting: false,
   error: null,
-  pagination: { page: 1, limit: 20, total: 0, pages: 0 },
+  pagination: DEFAULT_PAGINATION,
 
   fetchStrategies: async (params = {}) => {
     set({ isLoading: true, error: null })
     try {
       const response = await strategiesApi.list(params)
+      const rawPagination = response.data.pagination;
       set({
-        strategies: response.data.data,
-        pagination: response.data.pagination || { page: 1, limit: 20, total: 0, pages: 0 },
+        strategies: normalizeStrategies(response.data.data),
+        pagination: {
+          page: safeNumber(rawPagination?.page, 1),
+          limit: safeNumber(rawPagination?.limit, 20),
+          total: safeNumber(rawPagination?.total, 0),
+          pages: safeNumber(rawPagination?.pages, 0),
+        } || DEFAULT_PAGINATION,
         isLoading: false,
       })
     } catch (error) {
@@ -54,7 +93,7 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
     set({ isLoading: true })
     try {
       const response = await strategiesApi.get(id)
-      set({ selectedStrategy: response.data.data, isLoading: false })
+      set({ selectedStrategy: normalizeStrategy(response.data.data) || DEFAULT_STRATEGY, isLoading: false })
     } catch (error) {
       console.error('Failed to fetch strategy:', error)
       set({ error: 'Failed to fetch strategy details', isLoading: false })
@@ -65,7 +104,7 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
     set({ isSubmitting: true, error: null })
     try {
       const response = await strategiesApi.create(data)
-      const newStrategy = response.data.data
+      const newStrategy = normalizeStrategy(response.data.data)
       set((state) => ({
         strategies: [newStrategy, ...state.strategies],
         isSubmitting: false,
@@ -88,7 +127,7 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
         strategies: state.strategies.map((s) =>
           s.strategy_id === id ? { ...s, ...data } : s
         ),
-        selectedStrategy: state.selectedStrategy?.strategy_id === id
+        selectedStrategy: state.selectedStrategy.strategy_id === id
           ? { ...state.selectedStrategy, ...data }
           : state.selectedStrategy,
         isSubmitting: false,
@@ -104,7 +143,7 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
       await strategiesApi.delete(id)
       set((state) => ({
         strategies: state.strategies.filter((s) => s.strategy_id !== id),
-        selectedStrategy: state.selectedStrategy?.strategy_id === id ? null : state.selectedStrategy,
+        selectedStrategy: state.selectedStrategy.strategy_id === id ? DEFAULT_STRATEGY : state.selectedStrategy,
       }))
     } catch (error) {
       console.error('Failed to delete strategy:', error)
@@ -154,7 +193,7 @@ export const useStrategiesStore = create<StrategiesState>((set, get) => ({
     }))
   },
 
-  setSelectedStrategy: (strategy) => set({ selectedStrategy: strategy }),
+  setSelectedStrategy: (strategy) => set({ selectedStrategy: strategy || DEFAULT_STRATEGY }),
 
   clearError: () => set({ error: null }),
 }))

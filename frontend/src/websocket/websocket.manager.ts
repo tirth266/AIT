@@ -2,12 +2,13 @@
  * WebSocket Manager
  * ================
  * Production-grade WebSocket manager with:
+ * - JWT authentication using existing login token
  * - Auto reconnection with exponential backoff
  * - Heartbeat system
  * - Connection state tracking
  * - Message queueing for offline recovery
- * - Event batching and deduplication
- * - Reconnection replay
+ * - StrictMode-safe singleton lifecycle
+ * - No token fetching - uses existing JWT only
  */
 
 import { io, Socket } from 'socket.io-client'
@@ -34,7 +35,16 @@ interface QueuedMessage {
   timestamp: number
 }
 
-export class WebSocketManager {
+interface BatchedEvents {
+  ticks: Record<string, MarketTickPayload>
+  positions: Record<string, PositionUpdatePayload>
+  orders: Record<string, OrderUpdatePayload>
+  pnl: PnLUpdatePayload | null
+}
+
+let wsManagerInstance: WebSocketManager | null = null
+
+class WebSocketManager {
   private socket: Socket | null = null
   private state: WebSocketState
   private reconnectOptions: ReconnectOptions
@@ -44,13 +54,22 @@ export class WebSocketManager {
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null
   private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null
   private messageQueue: QueuedMessage[] = []
-  private processedMessageIds: Set<string> = new Set()
   private lastReconnectTime: number = 0
-  private currentToken: string | null = null
+  private listenersAttached = false
+  private isIntentionalDisconnect = false
+  private isConnecting = false
+
+  private batchedEvents: BatchedEvents = {
+    ticks: {},
+    positions: {},
+    orders: {},
+    pnl: null,
+  }
+  private batchTimeout: ReturnType<typeof setTimeout> | null = null
+  private readonly BATCH_INTERVAL = 50
 
   private readonly WS_URL: string
   private readonly MAX_QUEUE_SIZE = 100
-  private readonly MESSAGE_DEDUP_WINDOW = 5000
 
   constructor() {
     this.WS_URL = this.getWebSocketUrl()
@@ -67,13 +86,13 @@ export class WebSocketManager {
 
     this.reconnectOptions = {
       maxAttempts: 10,
-      initialDelay: 1000,
+      initialDelay: 2000,
       maxDelay: 30000,
-      backoffMultiplier: 1.5,
+      backoffMultiplier: 2,
     }
 
     this.heartbeatOptions = {
-      interval: 30000,
+      interval: 25000,
       timeout: 10000,
     }
 
@@ -82,23 +101,43 @@ export class WebSocketManager {
 
   private getWebSocketUrl(): string {
     const envUrl = import.meta.env.VITE_WS_URL
-    if (envUrl) return envUrl
+    if (envUrl && envUrl !== '') return envUrl.replace(/\/$/, '')
 
-    const isProduction = import.meta.env.PROD
-    if (isProduction) {
-      return window.location.origin.replace(/^http/, 'ws')
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+    const normalized = apiUrl.replace(/\/$/, '').replace(/\/api\/v1$/, '').replace(/\/api$/, '')
+    return normalized
+  }
+
+  private getToken(): string | null {
+    let token = localStorage.getItem('access_token')
+    if (token) {
+      console.log('[WS] Token loaded from localStorage')
+      return token
     }
 
-    return 'http://localhost:5000'
+    if (import.meta.env.DEV) {
+      console.log('[WS] DEV mode: using placeholder token for development')
+      token = 'dev_token_placeholder'
+      localStorage.setItem('access_token', token)
+      return token
+    }
+
+    console.warn('[WS] No access token found - please login first')
+    return null
+  }
+
+  public initAuth(token: string): void {
+    localStorage.setItem('access_token', token)
+    console.log('[WS] Token stored in localStorage')
   }
 
   private setupOfflineDetection(): void {
     if (typeof window === 'undefined') return
 
     window.addEventListener('online', () => {
-      console.log('[WS] Network online - attempting reconnection')
-      if (this.currentToken && this.state.status !== 'connected') {
-        this.handleReconnect()
+      console.log('[WS] Network online')
+      if (this.state.status === 'disconnected' && !this.isIntentionalDisconnect) {
+        this.attemptReconnect()
       }
     })
 
@@ -109,41 +148,71 @@ export class WebSocketManager {
     })
   }
 
-  connect(token?: string): void {
-    if (token) {
-      this.currentToken = token
+  connect(): void {
+    if (this.isConnecting) {
+      console.log('[WS] Connection already in progress, skipping')
+      return
     }
 
     if (this.socket?.connected) {
-      console.log('[WS] Already connected')
+      console.log('[WS] Already connected, skipping')
       return
     }
 
-    if (this.state.status === 'connecting') {
-      console.log('[WS] Connection in progress')
+    if (wsManagerInstance && wsManagerInstance !== this) {
+      console.log('[WS] Using existing manager instance, skipping')
       return
     }
+
+    const token = this.getToken()
+    if (!token) {
+      console.warn('[WS] No access token - cannot connect. Please login first.')
+      this.setState({
+        status: 'error',
+        error: 'No access token. Please login to enable WebSocket.',
+      })
+      return
+    }
+
+    wsManagerInstance = this
+    this.isIntentionalDisconnect = false
+    this.isConnecting = true
 
     this.setState({ status: 'connecting', error: null })
 
-    this.socket = io(this.WS_URL, {
-      transports: ['websocket', 'polling'],
-      auth: { token: this.currentToken || '' },
-      reconnection: false,
-      reconnectionAttempts: 0,
-      timeout: 20000,
-      forceNew: true,
-      withCredentials: true,
-    })
+    console.log('[WS] Attempting WebSocket connection with existing JWT...')
 
-    this.setupEventListeners()
+    try {
+      this.socket = io(this.WS_URL, {
+        transports: ['websocket', 'polling'],
+        autoConnect: false,
+        reconnection: true,
+        reconnectionAttempts: this.reconnectOptions.maxAttempts,
+        reconnectionDelay: this.reconnectOptions.initialDelay,
+        reconnectionDelayMax: this.reconnectOptions.maxDelay,
+        timeout: 20000,
+        withCredentials: true,
+        forceNew: true,
+        multiplex: false,
+        auth: { token },
+      })
+
+      this.setupEventListeners()
+      this.socket.connect()
+    } catch (error) {
+      console.error('[WS] Failed to create socket:', error)
+      this.isConnecting = false
+      this.setState({ status: 'error', error: 'Failed to create connection' })
+    }
   }
 
   private setupEventListeners(): void {
-    if (!this.socket) return
+    if (!this.socket || this.listenersAttached) return
+    this.listenersAttached = true
 
     this.socket.on('connect', () => {
-      console.log('[WS] Connected')
+      console.log('[WS] Socket connected', this.socket?.id)
+      this.isConnecting = false
       this.setState({
         status: 'connected',
         connectedAt: new Date().toISOString(),
@@ -151,50 +220,44 @@ export class WebSocketManager {
         error: null,
       })
       this.startHeartbeat()
-      this.emitStateEvent('connected', { connected: true })
-      this.flushMessageQueue()
-      this.resubscribe()
+      this.emitStateEvent('connected', { connected: true, sid: this.socket?.id })
     })
 
     this.socket.on('disconnect', (reason) => {
-      console.log('[WS] Disconnected:', reason)
+      console.log('[WS] Socket disconnected:', reason)
+      this.isConnecting = false
       this.setState({ status: 'disconnected' })
       this.stopHeartbeat()
       this.emitStateEvent('disconnected', { reason })
 
-      if (reason !== 'io client disconnect' && this.currentToken) {
+      if (!this.isIntentionalDisconnect && reason !== 'io client disconnect') {
         this.scheduleReconnect()
       }
     })
 
     this.socket.on('connect_error', (error) => {
       console.error('[WS] Connection error:', error.message)
-      this.setState({
-        status: 'error',
-        error: error.message,
-      })
-      this.scheduleReconnect()
-    })
+      this.isConnecting = false
 
-    this.socket.on('reconnect', (attemptNumber) => {
-      console.log(`[WS] Reconnected after ${attemptNumber} attempts`)
-      this.setState({ status: 'connected', reconnectAttempts: 0 })
-      this.resubscribe()
-      this.emitStateEvent('reconnected', { attempts: attemptNumber })
-    })
+      if (error.message.includes('401') || error.message.includes('Invalid token') || error.message.includes('jwt')) {
+        localStorage.removeItem('access_token')
+        this.setState({
+          status: 'error',
+          error: 'Authentication failed. Please login again.',
+        })
+      } else {
+        this.setState({
+          status: 'error',
+          error: error.message,
+        })
 
-    this.socket.on('reconnect_failed', () => {
-      console.error('[WS] Reconnection failed')
-      this.setState({
-        status: 'error',
-        error: 'Failed to reconnect after max attempts',
-      })
-      this.emitStateEvent('reconnect_failed', { attempts: this.state.reconnectAttempts })
+        if (this.state.reconnectAttempts < this.reconnectOptions.maxAttempts) {
+          this.scheduleReconnect()
+        }
+      }
     })
 
     this.setupMarketHandlers()
-    this.setupTradingHandlers()
-    this.setupNotificationHandlers()
     this.setupSystemHandlers()
   }
 
@@ -202,124 +265,90 @@ export class WebSocketManager {
     if (!this.socket) return
 
     this.socket.on('market_tick', (data: MarketTickPayload) => {
-      this.emitWithDedup(`market_tick_${data.symbol}`, data, () => {
-        this.emit('market_tick', data)
-      })
+      this.batchEvent('ticks', data.symbol, data)
     })
 
     this.socket.on('market:tick', (data: MarketTickPayload) => {
-      this.emitWithDedup(`market:tick_${data.symbol}`, data, () => {
-        this.emit('market:tick', data)
-      })
-    })
-
-    this.socket.on('market:depth', (data: unknown) => {
-      this.emit('market:depth', data)
-    })
-
-    this.socket.on('market:candle', (data: unknown) => {
-      this.emit('market:candle', data)
-    })
-
-    this.socket.on('index:nifty', (data: { value: number; change: number }) => {
-      this.emit('index_update', { index: 'NIFTY', ...data })
-    })
-
-    this.socket.on('index:sensex', (data: { value: number; change: number }) => {
-      this.emit('index_update', { index: 'SENSEX', ...data })
-    })
-
-    this.socket.on('index:banknifty', (data: { value: number; change: number }) => {
-      this.emit('index_update', { index: 'BANKNIFTY', ...data })
-    })
-
-    this.socket.on('market_status', (data: MarketStatusPayload) => {
-      this.emit('market_status', data)
-    })
-
-    this.socket.on('ai_signal', (data: AISignalPayload) => {
-      this.emit('ai_signal', data)
-    })
-  }
-
-  private setupTradingHandlers(): void {
-    if (!this.socket) return
-
-    this.socket.on('order_update', (data: OrderUpdatePayload) => {
-      this.emitWithDedup(`order_${data.order_id}`, data, () => {
-        this.emit('order_update', data)
-      })
-    })
-
-    this.socket.on('order_created', (data: OrderUpdatePayload) => {
-      this.emit('order_created', data)
-    })
-
-    this.socket.on('order_executed', (data: OrderUpdatePayload) => {
-      this.emit('order_executed', data)
-    })
-
-    this.socket.on('order_cancelled', (data: OrderUpdatePayload) => {
-      this.emit('order_cancelled', data)
+      this.batchEvent('ticks', data.symbol, data)
     })
 
     this.socket.on('position_update', (data: PositionUpdatePayload) => {
-      this.emitWithDedup(`position_${data.position_id}`, data, () => {
-        this.emit('position_update', data)
-      })
+      this.batchEvent('positions', data.position_id, data)
     })
 
-    this.socket.on('position_opened', (data: PositionUpdatePayload) => {
-      this.emit('position_opened', data)
-    })
-
-    this.socket.on('position_closed', (data: PositionUpdatePayload) => {
-      this.emit('position_closed', data)
+    this.socket.on('order_update', (data: OrderUpdatePayload) => {
+      this.batchEvent('orders', data.order_id, data)
     })
 
     this.socket.on('pnl_update', (data: PnLUpdatePayload) => {
-      this.emit('pnl_update', data)
+      this.batchedEvents.pnl = data
+      this.scheduleBatchFlush()
     })
 
-    this.socket.on('trade_executed', (data: unknown) => {
-      this.emit('trade_executed', data)
-    })
+    this.socket.on('market:depth', (data: unknown) => this.emitInternal('market:depth', data))
+    this.socket.on('market:candle', (data: unknown) => this.emitInternal('market:candle', data))
+    this.socket.on('market_status', (data: MarketStatusPayload) => this.emitInternal('market_status', data))
+    this.socket.on('ai_signal', (data: AISignalPayload) => this.emitInternal('ai_signal', data))
+    this.socket.on('notification', (data: NotificationPayload) => this.emitInternal('notification', data))
+    this.socket.on('strategy_update', (data: StrategyUpdatePayload) => this.emitInternal('strategy_update', data))
+    this.socket.on('signal:new', (data: AISignalPayload) => this.emitInternal('signal_new', data))
+    this.socket.on('trade_executed', (data: unknown) => this.emitInternal('trade_executed', data))
+    this.socket.on('position_opened', (data: PositionUpdatePayload) => this.emitInternal('position_opened', data))
+    this.socket.on('position_closed', (data: PositionUpdatePayload) => this.emitInternal('position_closed', data))
   }
 
-  private setupNotificationHandlers(): void {
-    if (!this.socket) return
+  private batchEvent(type: 'ticks' | 'positions' | 'orders', id: string, data: unknown): void {
+    this.batchedEvents[type][id] = data as never
+    this.scheduleBatchFlush()
+  }
 
-    this.socket.on('notification', (data: NotificationPayload) => {
-      this.emit('notification', data)
-    })
+  private scheduleBatchFlush(): void {
+    if (this.batchTimeout) return
 
-    this.socket.on('strategy_update', (data: StrategyUpdatePayload) => {
-      this.emit('strategy_update', data)
-    })
+    this.batchTimeout = setTimeout(() => {
+      this.flushBatchedEvents()
+    }, this.BATCH_INTERVAL)
+  }
 
-    this.socket.on('signal:new', (data: AISignalPayload) => {
-      this.emit('signal_new', data)
-    })
+  private flushBatchedEvents(): void {
+    this.batchTimeout = null
+
+    if (Object.keys(this.batchedEvents.ticks).length > 0) {
+      this.emitInternal('batched_ticks', Object.values(this.batchedEvents.ticks))
+      this.batchedEvents.ticks = {}
+    }
+
+    if (Object.keys(this.batchedEvents.positions).length > 0) {
+      this.emitInternal('batched_positions', Object.values(this.batchedEvents.positions))
+      this.batchedEvents.positions = {}
+    }
+
+    if (Object.keys(this.batchedEvents.orders).length > 0) {
+      this.emitInternal('batched_orders', Object.values(this.batchedEvents.orders))
+      this.batchedEvents.orders = {}
+    }
+
+    if (this.batchedEvents.pnl) {
+      this.emitInternal('pnl_update', this.batchedEvents.pnl)
+      this.batchedEvents.pnl = null
+    }
   }
 
   private setupSystemHandlers(): void {
     if (!this.socket) return
 
-    this.socket.on('connected', (data: { status: string }) => {
-      console.log('[WS] Server confirmed connection')
-    })
-
     this.socket.on('auth_success', (data: { user_id: string }) => {
-      console.log('[WS] Authentication successful:', data.user_id)
+      console.log('[WS] Auth success:', data.user_id)
+      this.setState({ error: null })
+      this.emitStateEvent('auth_success', data)
+      this.flushMessageQueue()
+      this.resubscribe()
     })
 
     this.socket.on('auth_error', (data: { message: string }) => {
       console.error('[WS] Auth error:', data.message)
       this.setState({ error: data.message })
-    })
-
-    this.socket.on('subscription_success', (data: { action: string; symbols?: string[] }) => {
-      console.log('[WS] Subscription success:', data)
+      this.emitStateEvent('auth_error', data)
     })
 
     this.socket.on('heartbeat', (data: { timestamp: string }) => {
@@ -333,26 +362,15 @@ export class WebSocketManager {
     this.socket.on('error', (data: { message: string }) => {
       console.error('[WS] Server error:', data.message)
     })
-  }
 
-  private emitWithDedup(messageId: string, data: unknown, emitFn: () => void): void {
-    const now = Date.now()
-    
-    if (this.processedMessageIds.has(messageId)) {
-      return
-    }
-
-    this.processedMessageIds.add(messageId)
-    emitFn()
-
-    setTimeout(() => {
-      this.processedMessageIds.delete(messageId)
-    }, this.MESSAGE_DEDUP_WINDOW)
+    this.socket.on('connected', (data: { status: string; session_id: string }) => {
+      console.log('[WS] Server acknowledged:', data.session_id)
+    })
   }
 
   private scheduleReconnect(): void {
-    const { reconnectAttempts, maxAttempts } = this.state
-    const { initialDelay, maxDelay, backoffMultiplier } = this.reconnectOptions
+    const { reconnectAttempts } = this.state
+    const { initialDelay, maxDelay, backoffMultiplier, maxAttempts } = this.reconnectOptions
 
     if (reconnectAttempts >= maxAttempts) {
       console.error('[WS] Max reconnection attempts reached')
@@ -364,8 +382,7 @@ export class WebSocketManager {
     }
 
     const now = Date.now()
-    if (now - this.lastReconnectTime < 1000) {
-      console.log('[WS] Reconnecting too soon, waiting...')
+    if (now - this.lastReconnectTime < 3000) {
       return
     }
 
@@ -381,15 +398,15 @@ export class WebSocketManager {
     this.lastReconnectTime = now
 
     this.reconnectTimeout = setTimeout(() => {
-      if (this.currentToken) {
-        this.setState({ reconnectAttempts: this.state.reconnectAttempts + 1 })
-        this.connect(this.currentToken)
-      }
+      this.setState({ reconnectAttempts: this.state.reconnectAttempts + 1 })
+      this.connect()
     }, delay)
   }
 
-  private handleReconnect(): void {
-    this.scheduleReconnect()
+  private attemptReconnect(): void {
+    if (this.socket?.connected) return
+    this.setState({ reconnectAttempts: 0 })
+    this.connect()
   }
 
   private resubscribe(): void {
@@ -406,7 +423,7 @@ export class WebSocketManager {
       if (this.socket?.connected) {
         this.socket.emit('ping')
         this.heartbeatTimeout = setTimeout(() => {
-          console.warn('[WS] Heartbeat timeout - disconnecting')
+          console.warn('[WS] Heartbeat timeout')
           this.socket?.disconnect()
         }, this.heartbeatOptions.timeout)
       }
@@ -450,7 +467,7 @@ export class WebSocketManager {
     this.state = { ...this.state, ...partial }
   }
 
-  private emit(event: string, data: unknown): void {
+  private emitInternal(event: string, data: unknown): void {
     const handlers = this.eventHandlers.get(event)
     if (!handlers) return
 
@@ -464,33 +481,44 @@ export class WebSocketManager {
   }
 
   private emitStateEvent(event: string, data: unknown): void {
-    this.emit(event, data)
+    this.emitInternal(event, data)
   }
 
   public authenticate(token: string): void {
-    this.currentToken = token
-    this.socket?.emit('authenticate', { token })
+    localStorage.setItem('access_token', token)
+
+    if (this.socket?.connected) {
+      console.log('[WS] Sending authenticate event')
+      this.socket.emit('authenticate', { token })
+    } else {
+      console.log('[WS] Queueing authenticate event')
+      this.queueMessage('authenticate', { token })
+    }
   }
 
   public subscribeMarket(symbols: string[]): void {
     if (symbols.length === 0) return
 
+    const upperSymbols = symbols.map(s => s.toUpperCase())
+
     if (this.socket?.connected) {
-      this.socket.emit('subscribe_market', { symbols })
-      symbols.forEach(s => this.state.subscribedSymbols.add(s.toUpperCase()))
+      this.socket.emit('subscribe_market', { symbols: upperSymbols })
+      upperSymbols.forEach(s => this.state.subscribedSymbols.add(s))
     } else {
-      this.queueMessage('subscribe_market', { symbols })
+      this.queueMessage('subscribe_market', { symbols: upperSymbols })
     }
   }
 
   public unsubscribeMarket(symbols: string[]): void {
     if (symbols.length === 0) return
 
+    const upperSymbols = symbols.map(s => s.toUpperCase())
+
     if (this.socket?.connected) {
-      this.socket.emit('unsubscribe_market', { symbols })
-      symbols.forEach(s => this.state.subscribedSymbols.delete(s.toUpperCase()))
+      this.socket.emit('unsubscribe_market', { symbols: upperSymbols })
+      upperSymbols.forEach(s => this.state.subscribedSymbols.delete(s))
     } else {
-      this.queueMessage('unsubscribe_market', { symbols })
+      this.queueMessage('unsubscribe_market', { symbols: upperSymbols })
     }
   }
 
@@ -573,15 +601,24 @@ export class WebSocketManager {
   }
 
   public disconnect(): void {
-    this.stopHeartbeat()
+    this.isIntentionalDisconnect = true
+
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout)
+      this.batchTimeout = null
+    }
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout)
       this.reconnectTimeout = null
     }
+
     if (this.socket) {
+      this.socket.removeAllListeners()
       this.socket.disconnect()
       this.socket = null
+      this.listenersAttached = false
     }
+
     this.setState({
       status: 'disconnected',
       connectedAt: null,
@@ -589,6 +626,11 @@ export class WebSocketManager {
       subscribedStrategies: new Set(),
     })
     this.messageQueue = []
+    console.log('[WS] Disconnected and cleaned up')
+  }
+
+  public forceDisconnect(): void {
+    this.disconnect()
   }
 
   public getStatus(): ConnectionStatus {
@@ -620,5 +662,12 @@ export class WebSocketManager {
   }
 }
 
-export const wsManager = new WebSocketManager()
+function getWsManager(): WebSocketManager {
+  if (!wsManagerInstance) {
+    wsManagerInstance = new WebSocketManager()
+  }
+  return wsManagerInstance
+}
+
+export const wsManager = getWsManager()
 export default wsManager

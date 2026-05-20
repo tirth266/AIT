@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
-  ArrowUpDown, TrendingUp, TrendingDown, 
+  TrendingUp, TrendingDown, 
   AlertTriangle, Check, X, Zap, Clock
 } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useShallow } from 'zustand/react/shallow'
 import { useTradingEngineStore } from '../../store'
 import type { MarketQuote, OrderType, TransactionType, ProductType } from '../../types'
 
@@ -28,7 +29,12 @@ const PRODUCT_TYPES: { value: ProductType; label: string; description: string }[
 ]
 
 export function OrderPanel({ symbol, quote, onOrderPlaced }: OrderPanelProps) {
-  const { createOrder, isSubmittingOrder, error, margin } = useTradingEngineStore()
+  const { createOrder, isSubmittingOrder, error, margin } = useTradingEngineStore(useShallow(state => ({
+    createOrder: state.createOrder,
+    isSubmittingOrder: state.isSubmittingOrder,
+    error: state.error,
+    margin: state.margin,
+  })))
   
   const [side, setSide] = useState<TransactionType>('BUY')
   const [orderType, setOrderType] = useState<OrderType>('MARKET')

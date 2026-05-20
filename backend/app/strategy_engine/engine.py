@@ -16,7 +16,7 @@ import threading
 from bson import ObjectId
 
 from app.database.connection import get_db
-from app.websocket.socket_manager import SocketManager
+from app.websocket.socket_manager import WebSocketManager
 from .signal_generator import SignalGenerator
 from .execution_engine import ExecutionEngine
 from .strategy_manager import StrategyManager
@@ -77,7 +77,7 @@ class StrategyEngine:
     Manages strategy lifecycle, signal generation, execution, and monitoring.
     """
 
-    def __init__(self, socket_manager: Optional[SocketManager] = None):
+    def __init__(self, socket_manager: Optional[WebSocketManager] = None):
         self.status = EngineStatus.STOPPED
         self.socket_manager = socket_manager
         self.strategies: Dict[str, StrategyInstance] = {}
@@ -441,7 +441,7 @@ def get_strategy_engine() -> StrategyEngine:
     return _engine_instance
 
 
-def initialize_engine(socket_manager: Optional[SocketManager] = None) -> StrategyEngine:
+def initialize_engine(socket_manager: Optional[WebSocketManager] = None) -> StrategyEngine:
     """Initialize the strategy engine with dependencies."""
     global _engine_instance
     _engine_instance = StrategyEngine(socket_manager)

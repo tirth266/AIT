@@ -171,23 +171,32 @@ export interface Portfolio {
 }
 
 export interface HoldingsSummary {
-  holdings: Holding[];
+  holdings?: Holding[];
+  total_invested: number;
+  total_current_value: number;
   total_value: number;
   total_cost: number;
   total_pnl: number;
+  total_pnl_percent: number;
   pnl_percent: number;
   count: number;
 }
 
 export interface Holding {
   symbol: string;
+  exchange?: Exchange;
   quantity: number;
   average_price: number;
+  avg_buy_price: number;
   current_price: number;
+  ltp: number;
   value: number;
+  current_value: number;
   cost: number;
   pnl: number;
   pnl_percent: number;
+  day_change: number;
+  day_change_percent: number;
 }
 
 export interface IntradaySummary {

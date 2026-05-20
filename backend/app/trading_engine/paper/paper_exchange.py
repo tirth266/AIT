@@ -8,7 +8,7 @@ import logging
 import asyncio
 import random
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 from dataclasses import dataclass, field
 from collections import defaultdict
 from enum import Enum
@@ -72,10 +72,26 @@ class PaperExchange:
         self._simulate_market = True
         self._tick_interval = 0.5
         
-        self._start_market_simulation()
+        self._market_task = None
     
-    def _start_market_simulation(self) -> None:
-        asyncio.create_task(self._market_simulation_loop())
+    async def start(self) -> None:
+        """Start the market simulation loop."""
+        if self._market_task is None:
+            self._market_task = asyncio.create_task(
+                self._market_simulation_loop()
+            )
+            self.logger.info("Paper exchange simulation started")
+    
+    async def stop(self) -> None:
+        """Stop the market simulation loop."""
+        if self._market_task:
+            self._market_task.cancel()
+            try:
+                await self._market_task
+            except asyncio.CancelledError:
+                pass
+            self._market_task = None
+            self.logger.info("Paper exchange simulation stopped")
     
     async def _market_simulation_loop(self) -> None:
         while True:
@@ -83,6 +99,8 @@ class PaperExchange:
                 if self._simulate_market:
                     await self._update_market_prices()
                     await self._process_pending_orders()
+            except asyncio.CancelledError:
+                break
             except Exception as e:
                 self.logger.error(f"Market simulation error: {e}")
             
@@ -236,8 +254,14 @@ class PaperExchange:
         return {symbol: self.get_quote(symbol) for symbol in self._base_prices.keys()}
 
 
-paper_exchange = PaperExchange()
+_paper_exchange = None
 
 
 def get_paper_exchange() -> PaperExchange:
-    return paper_exchange
+    """Lazy singleton factory for PaperExchange."""
+    global _paper_exchange
+    
+    if _paper_exchange is None:
+        _paper_exchange = PaperExchange()
+        
+    return _paper_exchange

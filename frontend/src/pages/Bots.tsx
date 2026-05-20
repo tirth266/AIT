@@ -11,13 +11,12 @@ import {
   AlertTriangle,
 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useTradingStore, useAuthStore } from '../store'
+import { useTradingStore } from '../store'
 import { Card, CardHeader, CardTitle, Button, Badge, StatusBadge, Select } from '../components/ui'
 import { mockBots, mockStrategies } from '../services/mockData'
 
 export function BotsPage() {
-  const { mode } = useAuthStore()
-  const { bots, setBots, strategies } = useTradingStore()
+  const { bots, setBots, strategies, mode } = useTradingStore()
   const [isLoading, setIsLoading] = useState<string | null>(null)
 
   const displayBots = bots.length > 0 ? bots : mockBots

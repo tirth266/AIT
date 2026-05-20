@@ -7,7 +7,6 @@ Strategy CRUD and management endpoints.
 import logging
 from bson import ObjectId
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.database.connection import get_db
 
@@ -17,7 +16,6 @@ bp = Blueprint('strategies', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_strategies():
     """
     List all strategies.
@@ -32,7 +30,7 @@ def list_strategies():
     Returns:
         List of strategies
     """
-    user_id = get_jwt_identity()
+    user_id = "default_user"
     is_active = request.args.get('is_active')
     mode = request.args.get('mode')
     symbol = request.args.get('symbol')
@@ -68,7 +66,6 @@ def list_strategies():
 
 
 @bp.route('', methods=['POST'])
-@jwt_required()
 def create_strategy():
     """
     Create a new strategy.
@@ -141,7 +138,6 @@ def create_strategy():
 
 
 @bp.route('/<strategy_id>', methods=['GET'])
-@jwt_required()
 def get_strategy(strategy_id):
     """
     Get a specific strategy.
@@ -173,7 +169,6 @@ def get_strategy(strategy_id):
 
 
 @bp.route('/<strategy_id>', methods=['PUT'])
-@jwt_required()
 def update_strategy(strategy_id):
     """
     Update a strategy.
@@ -215,7 +210,6 @@ def update_strategy(strategy_id):
 
 
 @bp.route('/<strategy_id>', methods=['DELETE'])
-@jwt_required()
 def delete_strategy(strategy_id):
     """
     Delete a strategy.
@@ -249,7 +243,6 @@ def delete_strategy(strategy_id):
 
 
 @bp.route('/<strategy_id>/clone', methods=['POST'])
-@jwt_required()
 def clone_strategy(strategy_id):
     """
     Clone a strategy.
@@ -297,7 +290,6 @@ def clone_strategy(strategy_id):
 
 
 @bp.route('/<strategy_id>/toggle', methods=['POST'])
-@jwt_required()
 def toggle_strategy(strategy_id):
     """
     Toggle strategy active status.

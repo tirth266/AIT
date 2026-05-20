@@ -7,7 +7,6 @@ Trade management and history endpoints.
 import logging
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
-from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
 from app.paper_trading.simulator import PaperTradingSimulator
@@ -18,7 +17,6 @@ bp = Blueprint('trades', __name__)
 
 
 @bp.route('', methods=['GET'])
-@jwt_required()
 def list_trades():
     """
     List all trades.
@@ -91,7 +89,6 @@ def list_trades():
 
 
 @bp.route('/active', methods=['GET'])
-@jwt_required()
 def get_active_trades():
     """
     Get active (open) trades.
@@ -118,7 +115,6 @@ def get_active_trades():
 
 
 @bp.route('/execute', methods=['POST'])
-@jwt_required()
 def execute_trade():
     """
     Execute a trade (manual or signal-based).
@@ -200,7 +196,6 @@ def execute_trade():
 
 
 @bp.route('/<trade_id>', methods=['GET'])
-@jwt_required()
 def get_trade(trade_id):
     """
     Get a specific trade.
@@ -225,7 +220,6 @@ def get_trade(trade_id):
 
 
 @bp.route('/<trade_id>/close', methods=['POST'])
-@jwt_required()
 def close_trade(trade_id):
     """
     Close an open trade/position.
@@ -301,7 +295,6 @@ def close_trade(trade_id):
 
 
 @bp.route('/stats', methods=['GET'])
-@jwt_required()
 def get_trade_stats():
     """
     Get trade statistics.

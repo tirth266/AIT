@@ -8,7 +8,8 @@ import React, { useState, useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { TrendingUp, TrendingDown, Activity } from 'lucide-react'
 import { clsx } from 'clsx'
-import { useMarketStore, useAuthStore } from '../../store'
+import { useShallow } from 'zustand/react/shallow'
+import { useMarketStore, useTradingStore } from '../../store'
 import { wsManager } from '../../websocket/websocket.manager'
 import type { MarketStatusPayload } from '../../websocket/websocket.types'
 
@@ -29,7 +30,7 @@ interface TickerItemProps {
   isIndex?: boolean
 }
 
-function TickerItem({ symbol, price, change, changePercent, isIndex }: TickerItemProps) {
+const TickerItem = React.memo(({ symbol, price, change, changePercent, isIndex }: TickerItemProps) => {
   const isPositive = change >= 0
 
   return (
@@ -47,11 +48,11 @@ function TickerItem({ symbol, price, change, changePercent, isIndex }: TickerIte
       </span>
     </div>
   )
-}
+})
 
 export function MarketTicker() {
-  const { prices, updatePrice } = useMarketStore()
-  const { mode } = useAuthStore()
+  const prices = useMarketStore(useShallow(state => state.prices))
+  const mode = useTradingStore(state => state.mode)
   const [marketStatus, setMarketStatus] = useState<MarketStatusPayload | null>(null)
 
   useEffect(() => {
@@ -65,15 +66,6 @@ export function MarketTicker() {
       unsubscribe()
     }
   }, [])
-
-  useEffect(() => {
-    const unsubscribe = wsManager.on('market_tick', (data: unknown) => {
-      const tick = data as { symbol: string; last_price: number; change: number; change_percent: number }
-      updatePrice(tick.symbol, tick.last_price, tick.change, tick.change_percent)
-    })
-
-    return unsubscribe
-  }, [updatePrice])
 
   const allItems = useMemo(() => {
     const items: TickerItemProps[] = []

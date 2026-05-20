@@ -1,7 +1,7 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios'
-import { useAuthStore } from '../store/auth'
+import axios from 'axios'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+const API_ROOT = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+const API_URL = `${API_ROOT.replace(/\/$/, '')}/api/v1`
 
 export const api = axios.create({
   baseURL: API_URL,
@@ -9,84 +9,8 @@ export const api = axios.create({
     'Content-Type': 'application/json',
   },
   timeout: 30000,
+  withCredentials: true,
 })
-
-let isRefreshing = false
-let refreshSubscribers: ((token: string) => void)[] = []
-
-const subscribeTokenRefresh = (cb: (token: string) => void) => {
-  refreshSubscribers.push(cb)
-}
-
-const onTokenRefreshed = (token: string) => {
-  refreshSubscribers.forEach(cb => cb(token))
-  refreshSubscribers = []
-}
-
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = useAuthStore.getState().accessToken
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => Promise.reject(error)
-)
-
-api.interceptors.response.use(
-  (response) => response,
-  async (error: AxiosError) => {
-    const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token: string) => {
-            originalRequest.headers.Authorization = `Bearer ${token}`
-            resolve(api(originalRequest))
-          })
-        })
-      }
-
-      originalRequest._retry = true
-      isRefreshing = true
-
-      try {
-        const refreshToken = useAuthStore.getState().refreshToken
-        if (refreshToken) {
-          const response = await axios.post(`${API_URL}/auth/refresh`, {}, {
-            headers: { Authorization: `Bearer ${refreshToken}` }
-          })
-          const { access_token } = response.data
-          useAuthStore.getState().setToken(access_token)
-          onTokenRefreshed(access_token)
-          originalRequest.headers.Authorization = `Bearer ${access_token}`
-          return api(originalRequest)
-        }
-      } catch (refreshError) {
-        useAuthStore.getState().logout()
-        window.location.href = '/login'
-        return Promise.reject(refreshError)
-      } finally {
-        isRefreshing = false
-      }
-    }
-
-    return Promise.reject(error)
-  }
-)
-
-export const authApi = {
-  login: (data: { email: string; password: string }) => api.post('/auth/login', data),
-  register: (data: { email: string; password: string; full_name: string; phone: string; pan_number?: string; broker?: string }) => api.post('/auth/register', data),
-  logout: () => api.post('/auth/logout'),
-  refresh: (refreshToken: string) => api.post('/auth/refresh', { refresh_token: refreshToken }),
-  verify: () => api.get('/auth/profile'),
-  getProfile: () => api.get('/auth/profile'),
-  updateProfile: (data: { full_name?: string; phone?: string }) => api.put('/auth/profile', data),
-  changePassword: (data: { current_password: string; new_password: string; confirm_password: string }) => api.put('/auth/change-password', data),
-}
 
 export const watchlistApi = {
   list: (params?: { page?: number; limit?: number }) => api.get('/watchlists', { params }),
@@ -169,6 +93,26 @@ export const notificationsApi = {
   delete: (id: string) => api.delete(`/notifications/${id}`),
   clear: (clearType?: 'read' | 'all') => api.delete('/notifications/clear', { data: { clear_type: clearType } }),
   unreadCount: () => api.get('/notifications/unread-count'),
+}
+
+export const engineApi = {
+  status: () => api.get('/engine/status'),
+  getSignals: (params?: { limit?: number }) => api.get('/engine/signals', { params }),
+  generateSignal: (strategyId: string) => api.post('/engine/signals', { strategy_id: strategyId }),
+  runBacktest: (data: {
+    strategy_id: string
+    symbol: string
+    start_date: string
+    end_date: string
+    initial_capital?: number
+  }) => api.post('/engine/backtest', data),
+  getPaperPortfolio: () => api.get('/engine/paper-trading/portfolio'),
+  getPaperTrades: (params?: { status?: string; limit?: number }) =>
+    api.get('/engine/paper-trading/trades', { params }),
+  getPaperPerformance: (params?: { days?: number }) =>
+    api.get('/engine/paper-trading/performance', { params }),
+  resetPaperPortfolio: () => api.post('/engine/paper-trading/reset'),
+  getRiskSummary: () => api.get('/engine/risk/summary'),
 }
 
 export const strategiesApi = {

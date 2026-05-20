@@ -1,0 +1,16 @@
+{
+  "name": "ait-trading-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIT Trading Platform — Flask + SocketIO Backend",
+  "scripts": {
+    "start": "python run.py",
+    "start:prod": "gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:5000 \"app:app\"",
+    "install:deps": "pip install -r requirements.txt",
+    "lint": "python -m flake8 app/",
+    "test": "python -m pytest tests/ -v"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -41,6 +41,7 @@ from app.observability.health import (
     health_check_registry,
     register_health_check,
     get_health_status,
+    setup_health_checks,
 )
 from app.observability.export import (
     PrometheusExporter,
@@ -73,6 +74,7 @@ __all__ = [
     "health_check_registry",
     "register_health_check",
     "get_health_status",
+    "setup_health_checks",
     "PrometheusExporter",
     "metrics_endpoint",
 ]

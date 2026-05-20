@@ -97,7 +97,7 @@ class HistoricalDataManager:
                 low=round(low_price, 2),
                 close=round(close_price, 2),
                 volume=volume,
-                value=round((open_price + high + low + close_price) / 4 * volume, 2) if volume > 0 else 0
+                value=round((open_price + high_price + low_price + close_price) / 4 * volume, 2) if volume > 0 else 0
             ))
             
             current_price = close_price

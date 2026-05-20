@@ -4,10 +4,11 @@
  * Real-time notification system with toasts.
  */
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Bell, Check, AlertCircle, Info, AlertTriangle, ShoppingCart, TrendingUp, Brain } from 'lucide-react'
 import { clsx } from 'clsx'
+import { useShallow } from 'zustand/react/shallow'
 import { useNotificationStore } from '../../store'
 import { wsManager } from '../../websocket/websocket.manager'
 import type { NotificationPayload } from '../../websocket/websocket.types'
@@ -43,7 +44,7 @@ interface ToastProps {
   onDismiss: (id: string) => void
 }
 
-function Toast({ toast, onDismiss }: ToastProps) {
+const Toast = React.memo(({ toast, onDismiss }: ToastProps) => {
   const Icon = TOAST_ICONS[toast.type] || Info
   const colorClass = TOAST_COLORS[toast.type] || TOAST_COLORS.info
 
@@ -91,14 +92,14 @@ function Toast({ toast, onDismiss }: ToastProps) {
       </div>
     </motion.div>
   )
-}
+})
 
 interface ToastContainerProps {
   toasts: ToastNotification[]
   onDismiss: (id: string) => void
 }
 
-function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
+const ToastContainer = React.memo(({ toasts, onDismiss }: ToastContainerProps) => {
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2 max-h-screen overflow-y-auto">
       <AnimatePresence>
@@ -108,6 +109,21 @@ function ToastContainer({ toasts, onDismiss }: ToastContainerProps) {
       </AnimatePresence>
     </div>
   )
+})
+
+const getToastType = (notificationType: string): ToastNotification['type'] => {
+  const map: Record<string, ToastNotification['type']> = {
+    'ORDER_FILLED': 'order',
+    'ORDER_CANCELLED': 'warning',
+    'ORDER_REJECTED': 'error',
+    'POSITION_OPENED': 'order',
+    'POSITION_CLOSED': 'success',
+    'SIGNAL': 'signal',
+    'ALERT': 'warning',
+    'ERROR': 'error',
+    'SYSTEM': 'info',
+  }
+  return map[notificationType] || 'info'
 }
 
 interface NotificationCenterProps {
@@ -116,11 +132,27 @@ interface NotificationCenterProps {
 
 export function NotificationCenter({ className }: NotificationCenterProps) {
   const [toasts, setToasts] = useState<ToastNotification[]>([])
-  const { notifications, fetchNotifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore()
+  const { notifications, unreadCount } = useNotificationStore(useShallow(state => ({
+    notifications: state.notifications,
+    unreadCount: state.unreadCount,
+  })))
+  
+  const fetchNotifications = useNotificationStore(state => state.fetchNotifications)
+  const markAsRead = useNotificationStore(state => state.markAsRead)
+  const markAllAsRead = useNotificationStore(state => state.markAllAsRead)
 
   useEffect(() => {
     fetchNotifications({ limit: 20 })
   }, [fetchNotifications])
+
+  const addToast = useCallback((toast: Omit<ToastNotification, 'id'>) => {
+    const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    setToasts((prev) => [...prev, { ...toast, id }])
+  }, [])
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
 
   useEffect(() => {
     const unsubscribe = wsManager.on<NotificationPayload>('notification', (data) => {
@@ -135,31 +167,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
     })
 
     return unsubscribe
-  }, [])
-
-  const addToast = useCallback((toast: Omit<ToastNotification, 'id'>) => {
-    const id = `toast_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    setToasts((prev) => [...prev, { ...toast, id }])
-  }, [])
-
-  const dismissToast = useCallback((id: string) => {
-    setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, [])
-
-  const getToastType = (notificationType: string): ToastNotification['type'] => {
-    const map: Record<string, ToastNotification['type']> = {
-      'ORDER_FILLED': 'order',
-      'ORDER_CANCELLED': 'warning',
-      'ORDER_REJECTED': 'error',
-      'POSITION_OPENED': 'order',
-      'POSITION_CLOSED': 'success',
-      'SIGNAL': 'signal',
-      'ALERT': 'warning',
-      'ERROR': 'error',
-      'SYSTEM': 'info',
-    }
-    return map[notificationType] || 'info'
-  }
+  }, [addToast])
 
   return (
     <>
@@ -228,14 +236,8 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
           )}
         </div>
       </div>
-
-      <NotificationToaster addToast={addToast} />
     </>
   )
-}
-
-export function NotificationToaster({ addToast }: { addToast: (toast: Omit<ToastNotification, 'id'>) => void }) {
-  return null
 }
 
 export default NotificationCenter

@@ -207,7 +207,7 @@ class ConnectionLimitManager:
         with self._lock:
             return self._limits.get(user_id, self.default_limit)
 
-    async def can_connect(self, user_id: str) -> Tuple[bool, int]:
+    async def can_connect(self, user_id: str) -> tuple[bool, int]:
         """Check if user can establish a new connection."""
         try:
             redis = get_redis_async()

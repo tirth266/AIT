@@ -32,12 +32,16 @@ def init_request_logging(app: Flask) -> None:
 
     @app.after_request
     def after_request(response):
-        if hasattr(request, 'start_time'):
-            elapsed = time.time() - request.start_time
+        # Use getattr to avoid AttributeError if before_request was skipped
+        request_id = getattr(request, 'id', 'unknown')
+        start_time = getattr(request, 'start_time', None)
+        
+        if start_time:
+            elapsed = time.time() - start_time
             logger.info(
                 f"Request completed: {request.method} {request.path} - {response.status_code} ({elapsed:.3f}s)",
                 extra={
-                    'request_id': request.id,
+                    'request_id': request_id,
                     'method': request.method,
                     'path': request.path,
                     'status_code': response.status_code,

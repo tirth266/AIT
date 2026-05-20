@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 Order Manager
 =============
@@ -7,11 +9,11 @@ Manages order lifecycle, validation, and state transitions.
 import logging
 import asyncio
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Any
+from typing import Optional, Any
 from enum import Enum
 
 from .engine import (
-    TradingEngine, Order, OrderStatus, OrderType, 
+    TradingEngine, Order, Trade, OrderStatus, OrderType, 
     TransactionType, ProductType, Exchange, get_trading_engine
 )
 
@@ -34,7 +36,7 @@ class OrderValidator:
     VALID_VALIDITIES = ["DAY", "IOC", "GTD", "GTC"]
     
     @classmethod
-    def validate(cls, order_data: Dict) -> tuple[bool, Optional[str]]:
+    def validate(cls, order_data: dict) -> tuple[bool, Optional[str]]:
         if not order_data.get('symbol'):
             return False, "Symbol is required"
         
@@ -106,7 +108,7 @@ class OrderManager:
         self.validator = OrderValidator()
         self.logger = logging.getLogger('order_manager')
     
-    async def create_order(self, order_data: Dict) -> tuple[Optional[Order], Optional[str]]:
+    async def create_order(self, order_data: dict) -> tuple[Optional[Order], Optional[str]]:
         is_valid, error = self.validator.validate(order_data)
         if not is_valid:
             return None, error
@@ -171,7 +173,7 @@ class OrderManager:
         
         self.logger.info(f"Order {order.order_id} status: {old_status} -> {new_status}")
     
-    async def update_order(self, order_id: str, update_data: Dict) -> tuple[Optional[Order], Optional[str]]:
+    async def update_order(self, order_id: str, update_data: dict) -> tuple[Optional[Order], Optional[str]]:
         order = self.engine.get_order(order_id)
         if not order:
             return None, "Order not found"
@@ -291,7 +293,7 @@ class OrderManager:
     def get_order(self, order_id: str) -> Optional[Order]:
         return self.engine.get_order(order_id)
     
-    def get_user_orders(self, user_id: str, filters: Optional[Dict] = None) -> List[Order]:
+    def get_user_orders(self, user_id: str, filters: Optional[dict] = None) -> list[Order]:
         orders = self.engine.get_user_orders(user_id)
         
         if not filters:
