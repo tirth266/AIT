@@ -49,9 +49,6 @@ urllib3>=2.1.0
 numpy==1.26.4
 pandas==2.2.2
 
-# Technical Analysis — pure-Python replacement for ta-lib (no C compiler needed)
-# pandas-ta @ git+https://github.com/twopirllc/pandas-ta.git
-
 # WebSocket client
 websocket-client==1.7.0
 
