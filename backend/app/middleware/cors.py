@@ -1,4 +1,5 @@
 import logging
+from flask import request, jsonify
 from flask_cors import CORS
 
 logger = logging.getLogger('trading_app')
@@ -21,4 +22,19 @@ def init_cors(app):
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
     )
     
+    @app.before_request
+    def debug_cors():
+        """Log CORS-related details for debugging."""
+        if request.path.startswith('/api/'):
+            origin = request.headers.get('Origin')
+            method = request.method
+            logger.info(f"CORS Request: {method} {request.path} | Origin: {origin}")
+            
+            # Global OPTIONS bypass for preflight
+            if method == "OPTIONS":
+                logger.info(f"Handling global OPTIONS preflight for {request.path}")
+                response = app.make_default_options_response()
+                # Flask-CORS will still wrap this response if it matches the resources
+                return response
+
     logger.info("CORS successfully initialized for https://ait-flame.vercel.app and http://localhost:5173")
