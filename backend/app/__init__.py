@@ -21,11 +21,15 @@ jwt = JWTManager()
 socketio = SocketIO(
     cors_allowed_origins=[
         os.environ.get("FRONTEND_ORIGIN", "https://ait-flame.vercel.app"),
-        "http://localhost:5173"
+        "https://ait-flame.vercel.app",
+        "http://localhost:5173",
+        "http://localhost:3000"
     ],
     async_mode="eventlet",
     logger=True,
-    engineio_logger=True
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25
 )
 
 def create_app(config_name: str = None) -> Flask:
@@ -96,17 +100,24 @@ def create_app(config_name: str = None) -> Flask:
     # SocketIO will be initialized with the app
     socketio.init_app(app)
 
-    # Deferred imports for blueprints and services to prevent startup crashes
+    # Robust initialization of extensions and middleware
     try:
-        # Initialize database and other extensions
+        # 1. Initialize database and core extensions
         init_extensions(app)
-        print("[OK] Extensions initialized")
+        print("[OK] Core extensions initialized")
+    except Exception as e:
+        print(f"[WARN] Some extensions failed to initialize: {e}")
+        import traceback
+        traceback.print_exc()
 
+    try:
+        # 2. Register middleware (CORS, Security, etc.)
+        # This MUST run for the API to be accessible
         from .middleware import register_middleware
         register_middleware(app)
         print("[OK] Middleware registered")
     except Exception as e:
-        print(f"[ERROR] Middleware registration failed: {e}")
+        print(f"[CRITICAL] Middleware registration failed: {e}")
         import traceback
         traceback.print_exc()
 

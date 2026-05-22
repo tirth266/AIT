@@ -10,61 +10,75 @@ def init_cors(app):
     Handles both REST API and global preflight requirements.
     """
     import os
+    
+    # Get configuration from environment
+    # Be strict: if it's production, we should have a FRONTEND_ORIGIN
     frontend_origin = os.getenv("FRONTEND_ORIGIN", "https://ait-flame.vercel.app")
-    allowed_origins = [frontend_origin, "http://localhost:5173"]
+    
+    # Allow local development and the production frontend
+    allowed_origins = [
+        frontend_origin,
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "https://ait-flame.vercel.app" # Backup hardcoded origin
+    ]
 
-    # 1. Configure Flask-CORS for production
+    logger.info(f"CORS initialized with allowed origins: {allowed_origins}")
+
+    # 1. Configure Flask-CORS
+    # We apply this globally to the app
     CORS(
         app,
         resources={
-            r"/api/*": {
-                "origins": allowed_origins
+            r"/*": {
+                "origins": allowed_origins,
+                "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+                "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+                "supports_credentials": True,
+                "expose_headers": ["Content-Type", "Authorization"],
+                "max_age": 600
             }
-        },
-        supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        }
     )
 
-    # 2. Add global OPTIONS handler for robust preflight support
+    # 2. Manual Preflight Failsafe
+    # This ensures that even if a route or blueprint has issues, OPTIONS requests are handled.
     @app.before_request
     def handle_preflight():
         if request.method == "OPTIONS":
-            logger.info(f"Handling preflight OPTIONS request from: {request.origin}")
-            response = jsonify({"status": "ok"})
-            
-            # Use dynamic origin if it's one of our allowed origins
             origin = request.headers.get("Origin")
             
+            # Create response
+            response = jsonify({"status": "preflight_ok"})
+            
+            # Determine which origin to allow
             if origin in allowed_origins:
                 response.headers.add("Access-Control-Allow-Origin", origin)
             else:
-                # Fallback to requested production domain
                 response.headers.add("Access-Control-Allow-Origin", frontend_origin)
                 
-            response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization")
-            response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
+            response.headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization,X-Requested-With,Accept")
+            response.headers.add("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS,PATCH")
             response.headers.add("Access-Control-Allow-Credentials", "true")
+            response.headers.add("Access-Control-Max-Age", "600")
+            
             return response, 200
 
-    # 3. Ensure consistent CORS headers for every response
+    # 3. Global Header Injector (Failsafe for 4xx/5xx errors)
     @app.after_request
-    def after_request(response):
-        origin = request.headers.get("Origin")
+    def add_cors_headers(response):
+        # If the header is already present (e.g. by Flask-CORS), don't duplicate it
+        if "Access-Control-Allow-Origin" not in response.headers:
+            origin = request.headers.get("Origin")
+            if origin in allowed_origins:
+                response.headers["Access-Control-Allow-Origin"] = origin
+            else:
+                response.headers["Access-Control-Allow-Origin"] = frontend_origin
         
-        if origin in allowed_origins:
-            response.headers["Access-Control-Allow-Origin"] = origin
-        else:
-            response.headers["Access-Control-Allow-Origin"] = frontend_origin
-            
-        response.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-        response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS"
-        response.headers["Access-Control-Allow-Credentials"] = "true"
-        
-        # Log outgoing CORS headers for debugging
-        if "/api/" in request.path:
-            logger.debug(f"CORS response for {request.path}: {response.headers.get('Access-Control-Allow-Origin')}")
+        # Ensure credentials header is present if origin is not '*'
+        if response.headers.get("Access-Control-Allow-Origin") != "*":
+            response.headers["Access-Control-Allow-Credentials"] = "true"
             
         return response
 
-    logger.info("Production-grade CORS and Preflight handlers initialized")
+    logger.info("Production-grade CORS initialized")

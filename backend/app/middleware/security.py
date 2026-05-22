@@ -110,7 +110,11 @@ class SecurityMiddleware:
         @app.before_request
         def validate_request():
             """Validate incoming requests."""
-            # Skip validation for certain paths
+            # 1. ALWAYS skip validation for OPTIONS (CORS preflight)
+            if request.method == "OPTIONS":
+                return None
+
+            # 2. Skip validation for health and auth paths
             if request.path.startswith('/health') or \
                request.path.startswith('/api/v1/auth/login') or \
                request.path.startswith('/api/v1/broker/angelone/login') or \

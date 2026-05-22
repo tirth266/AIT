@@ -15,10 +15,11 @@ from pymongo import MongoClient
 import redis
 
 from .celery_app import celery_app
+from .services.redis_service import get_redis_service
 
 logger = logging.getLogger('trading_app')
 
-# Centralized Limiter instance
+# Centralized Limiter instance (initialized without app initially)
 limiter = Limiter(key_func=get_remote_address)
 mongo_client = None
 mongo_db = None
