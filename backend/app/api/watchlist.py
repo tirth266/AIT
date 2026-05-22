@@ -16,7 +16,7 @@ logger = logging.getLogger('trading_app')
 bp = Blueprint('watchlist', __name__)
 
 
-@bp.route('', methods=['GET'])
+@bp.route('', methods=['GET', 'OPTIONS'])
 def list_watchlists():
     """
     List all watchlists for the user.

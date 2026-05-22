@@ -211,7 +211,7 @@ def list_positions():
     }), 200
 
 
-@bp.route('/positions/open', methods=['GET'])
+@bp.route('/positions/open', methods=['GET', 'OPTIONS'])
 def get_open_positions():
     """Get open positions."""
     user_id = "default_user"

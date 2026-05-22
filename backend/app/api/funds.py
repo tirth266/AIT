@@ -16,7 +16,7 @@ logger = logging.getLogger('trading_app')
 bp = Blueprint('funds', __name__)
 
 
-@bp.route('', methods=['GET'])
+@bp.route('', methods=['GET', 'OPTIONS'])
 def get_funds():
     """
     Get user's funds and balance information.

@@ -22,7 +22,7 @@ def get_api_client():
         logger.error(f"Failed to initialize AngelOne client: {e}")
         return None
 
-@bp.route('/login', methods=['GET', 'POST'])
+@bp.route('/login', methods=['GET', 'POST', 'OPTIONS'])
 def login():
     """Login to Angel One using environment credentials."""
     logger.info(f'Angel One login request: {request.method}')
@@ -147,7 +147,7 @@ def get_funds():
     if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
     return jsonify(client.get_funds())
 
-@bp.route('/positions', methods=['GET'])
+@bp.route('/positions', methods=['GET', 'OPTIONS'])
 def get_positions():
     client = get_api_client()
     if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
@@ -159,7 +159,7 @@ def get_orders():
     if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
     return jsonify(client.get_order_book())
 
-@bp.route('/holdings', methods=['GET'])
+@bp.route('/holdings', methods=['GET', 'OPTIONS'])
 def get_holdings():
     client = get_api_client()
     if not client: return jsonify({'status': False, 'message': 'Client error'}), 500

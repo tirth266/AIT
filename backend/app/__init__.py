@@ -12,9 +12,12 @@ from flask_cors import CORS
 
 from .config import config
 
-# Initialize SocketIO globally for easy access
+# Initialize SocketIO globally with production CORS settings
 socketio = SocketIO(
-    cors_allowed_origins="*",
+    cors_allowed_origins=[
+        os.environ.get("FRONTEND_ORIGIN", "https://ait-flame.vercel.app"),
+        "http://localhost:5173"
+    ],
     async_mode="eventlet",
     logger=True,
     engineio_logger=True
@@ -68,17 +71,10 @@ def create_app(config_name: str = None) -> Flask:
             "error": str(e)
         }), 500
 
-    # Initialize CORS with permissive settings for production stability
-    CORS(
-        app,
-        resources={r"/*": {"origins": "*"}},
-        supports_credentials=True
-    )
-
-    # Initialize SocketIO with the app
+    # SocketIO will be initialized with the app
     socketio.init_app(app)
 
-    # Deferred imports for blueprints and services to prevent startup crashes
+    # All CORS and Preflight logic is handled in the middleware
     try:
         from .middleware import register_middleware
         register_middleware(app)

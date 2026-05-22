@@ -15,7 +15,7 @@ logger = logging.getLogger('trading_app')
 bp = Blueprint('market', __name__)
 
 
-@bp.route('/candles', methods=['GET'])
+@bp.route('/candles', methods=['GET', 'OPTIONS'])
 def get_candles():
     """
     Get OHLCV candle data.
@@ -84,7 +84,7 @@ def get_current_candle():
         }), 502
 
 
-@bp.route('/quotes', methods=['GET'])
+@bp.route('/quotes', methods=['GET', 'OPTIONS'])
 def get_quotes():
     """
     Get current quotes for multiple symbols.
