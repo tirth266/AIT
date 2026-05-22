@@ -54,6 +54,10 @@ def create_app(config_name: str = None) -> Flask:
             "status": "pong"
         })
 
+    @app.route('/favicon.ico')
+    def favicon():
+        return '', 204
+
     # Robust global exception handler
     @app.errorhandler(Exception)
     def handle_exception(e):
