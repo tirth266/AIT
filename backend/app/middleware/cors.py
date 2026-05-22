@@ -1,20 +1,19 @@
-import os
+import logging
 from flask_cors import CORS
 
-def init_cors(app):
-    raw_origins = os.getenv("FRONTEND_URL", "")
-    allowed_origins = [origin.strip() for origin in raw_origins.split(',') if origin.strip()]
-    if not allowed_origins:
-        raise RuntimeError(
-            'FRONTEND_URL is not set. Set FRONTEND_URL to your frontend deployment URL(s) before starting the backend.'
-        )
+logger = logging.getLogger('trading_app')
 
+def init_cors(app):
+    """
+    Initialize CORS with explicit origins to support credentials and preflight requests.
+    """
     CORS(
         app,
-        resources={
-            r"/api/*": {
-                "origins": allowed_origins
-            }
-        },
+        resources={r"/api/*": {"origins": [
+            "http://localhost:5173",
+            "https://ait-flame.vercel.app"
+        ]}},
         supports_credentials=True
     )
+    
+    logger.info("CORS initialized explicitly for localhost and Vercel.")

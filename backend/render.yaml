@@ -1,6 +1,13 @@
 services:
   - type: web
     name: ait-backend
-    env: docker
-    dockerfilePath: Dockerfile
-    startCommand: gunicorn -k eventlet -b 0.0.0.0:$PORT run:app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT run:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: SOCKET_ASYNC_MODE
+        value: eventlet

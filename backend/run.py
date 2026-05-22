@@ -6,36 +6,40 @@ import sys
 import logging
 from dotenv import load_dotenv
 
-# Add current directory and its parent to path to handle various import styles
+# Set up logging for startup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('startup')
+
+logger.info("Starting AIT Backend initialization...")
+
+# Add current directory to path
 current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
 
 # Load environment variables
 load_dotenv()
 
-from app import create_app, socketio
-
-app = create_app()
-
-@app.route("/")
-def health_check_root():
-    return {
-        "status": "running",
-        "service": "AIT Trading Platform",
-        "environment": os.environ.get("FLASK_ENV", "production")
-    }
+try:
+    from app import create_app, socketio
+    app = create_app()
+    logger.info("Flask app created successfully")
+except Exception as e:
+    logger.error(f"Failed to create Flask app: {e}")
+    import traceback
+    logger.error(traceback.format_exc())
+    # We must raise here so Gunicorn knows the worker failed to boot
+    raise
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
+    # Get port from environment variable for Render deployment
+    port = int(os.environ.get("PORT", 5000))
     
-    print("Starting Flask application via socketio.run...")
-    print(f"PORT: {port}")
-    print(f"ENV: {os.environ.get('FLASK_ENV', 'production')}")
-
+    logger.info(f"Starting AIT Backend on port {port} via socketio.run...")
+    
     socketio.run(
         app,
         host="0.0.0.0",
         port=port,
-        debug=False,
-        allow_unsafe_werkzeug=True
+        debug=False
     )

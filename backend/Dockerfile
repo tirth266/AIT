@@ -19,12 +19,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 
 RUN pip install --upgrade pip setuptools wheel
-
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 10000
+# Render will pass the PORT environment variable
+ENV PORT=10000
 
 # Using gunicorn with eventlet for optimal WebSocket support
-CMD ["gunicorn", "--worker-class", "eventlet", "-w", "1", "-b", "0.0.0.0:10000", "run:app"]
+# We bind to 0.0.0.0:$PORT to ensure Render can route traffic to it
+CMD gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT run:app

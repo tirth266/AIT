@@ -55,18 +55,23 @@ def login():
             }), 400
 
         from ..services.auth_service import AuthService
-        import traceback
         
-        async def do_login():
-            auth_service = AuthService()
-            return await auth_service.login(client_code=client_code, password=password, totp=totp)
-
         try:
-            data = asyncio.run(do_login())
+            auth_service = AuthService()
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                data = loop.run_until_complete(auth_service.login(client_code=client_code, password=password, totp=totp))
+            finally:
+                loop.close()
         except Exception as login_inner:
-            logger.error(f'Async login execution failed: {login_inner}')
-            logger.error(f'Inner traceback:\n{traceback.format_exc()}')
-            raise
+            logger.error(f'Login execution failed: {login_inner}')
+            return jsonify({
+                'success': False,
+                'error': 'LOGIN_FAILED',
+                'message': str(login_inner)
+            }), 401
 
         if data:
             session_manager.set_tokens(
