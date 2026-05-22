@@ -42,6 +42,9 @@ def login():
     Login to Angel One using SmartAPI.
     Uses provided clientcode, password and totp (secret) to generate a session.
     """
+    if request.method == 'OPTIONS':
+        return '', 204
+
     import traceback
     import os
     import pyotp

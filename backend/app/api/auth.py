@@ -33,13 +33,9 @@ def generate_token(user_id: str = 'default_user') -> str:
 def get_token():
     """
     Get authentication token for WebSocket connection.
-
-    This is a simplified auth for the single-user trading platform.
-    In production, this would validate credentials first.
-
-    Returns:
-        JWT token for WebSocket authentication
     """
+    if request.method == 'OPTIONS':
+        return '', 204
     try:
         token = generate_token('default_user')
 
@@ -62,6 +58,8 @@ def get_token():
 @bp.route('/verify', methods=['POST', 'OPTIONS'])
 def verify_token():
     """Verify a JWT token."""
+    if request.method == 'OPTIONS':
+        return '', 204
     data = request.get_json() or {}
     token = data.get('token')
 
@@ -95,6 +93,8 @@ def verify_token():
 @bp.route('/refresh', methods=['POST', 'OPTIONS'])
 def refresh_token():
     """Refresh an existing token."""
+    if request.method == 'OPTIONS':
+        return '', 204
     data = request.get_json() or {}
     old_token = data.get('token')
 

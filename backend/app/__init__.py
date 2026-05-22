@@ -20,10 +20,8 @@ jwt = JWTManager()
 # Initialize SocketIO globally with production CORS settings
 socketio = SocketIO(
     cors_allowed_origins=[
-        os.environ.get("FRONTEND_ORIGIN", "https://ait-flame.vercel.app"),
         "https://ait-flame.vercel.app",
-        "http://localhost:5173",
-        "http://localhost:3000"
+        "http://localhost:5173"
     ],
     async_mode="eventlet",
     logger=True,
@@ -51,6 +49,17 @@ def create_app(config_name: str = None) -> Flask:
             app.config.from_object(config['production'])
     except Exception as e:
         print(f"Config loading failed: {e}")
+
+    # Register middleware (CORS, Security, etc.) IMMEDIATELY after config
+    # This ensures CORS headers are handled even if subsequent steps fail
+    try:
+        from .middleware import register_middleware
+        register_middleware(app)
+        print("[OK] Middleware registered (including CORS)")
+    except Exception as e:
+        print(f"[CRITICAL] Middleware registration failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     # Initialize JWT
     jwt.init_app(app)
@@ -107,17 +116,6 @@ def create_app(config_name: str = None) -> Flask:
         print("[OK] Core extensions initialized")
     except Exception as e:
         print(f"[WARN] Some extensions failed to initialize: {e}")
-        import traceback
-        traceback.print_exc()
-
-    try:
-        # 2. Register middleware (CORS, Security, etc.)
-        # This MUST run for the API to be accessible
-        from .middleware import register_middleware
-        register_middleware(app)
-        print("[OK] Middleware registered")
-    except Exception as e:
-        print(f"[CRITICAL] Middleware registration failed: {e}")
         import traceback
         traceback.print_exc()
 
