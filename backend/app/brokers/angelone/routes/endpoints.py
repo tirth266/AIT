@@ -150,95 +150,166 @@ def disconnect():
     success = session_manager.disconnect()
     return jsonify({'success': success, 'message': 'Disconnected' if success else 'Failed'})
 
-@bp.route('/profile', methods=['GET'])
+@bp.route('/profile', methods=['GET', 'OPTIONS'])
 def get_profile():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    return jsonify(client.get_profile())
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+        
+        response = client.get_profile()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching profile: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch profile', 'data': {}}), 500
 
-@bp.route('/funds', methods=['GET'])
+@bp.route('/funds', methods=['GET', 'OPTIONS'])
 def get_funds():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    return jsonify(client.get_funds())
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+        
+        response = client.get_funds()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching funds: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch funds', 'data': {}}), 500
 
 @bp.route('/positions', methods=['GET', 'OPTIONS'])
 def get_positions():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    return jsonify(client.get_positions())
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+        
+        response = client.get_positions()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching positions: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch positions', 'data': []}), 500
 
-@bp.route('/orders', methods=['GET'])
+@bp.route('/orders', methods=['GET', 'OPTIONS'])
 def get_orders():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    return jsonify(client.get_order_book())
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+        
+        response = client.get_order_book()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching orders: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch orders', 'data': []}), 500
 
 @bp.route('/holdings', methods=['GET', 'OPTIONS'])
 def get_holdings():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    return jsonify(client.get_holdings())
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+        
+        response = client.get_holdings()
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching holdings: {e}")
+        return jsonify({'success': False, 'message': 'Failed to fetch holdings', 'data': []}), 500
 
-@bp.route('/order/place', methods=['POST'])
+@bp.route('/order/place', methods=['POST', 'OPTIONS'])
 def place_order():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    data = request.json
-    required = ['variety', 'tradingsymbol', 'symboltoken', 'transactiontype', 
-                'exchange', 'ordertype', 'producttype', 'duration', 'price', 
-                'squareoff', 'stoploss', 'quantity']
-    params = {k: data.get(k, "") for k in required}
-    
-    # Validation
-    if not all([params['tradingsymbol'], params['symboltoken'], params['transactiontype'], params['quantity']]):
-        return jsonify({'status': False, 'message': 'Missing required fields'}), 400
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+            
+        data = request.json or {}
+        required = ['variety', 'tradingsymbol', 'symboltoken', 'transactiontype', 
+                    'exchange', 'ordertype', 'producttype', 'duration', 'price', 
+                    'squareoff', 'stoploss', 'quantity']
+        params = {k: data.get(k, "") for k in required}
         
-    return jsonify(client.place_order(params))
+        if not all([params['tradingsymbol'], params['symboltoken'], params['transactiontype'], params['quantity']]):
+            return jsonify({'success': False, 'message': 'Missing required fields'}), 400
+            
+        response = client.place_order(params)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error placing order: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/order/modify', methods=['POST'])
+@bp.route('/order/modify', methods=['POST', 'OPTIONS'])
 def modify_order():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    data = request.json
-    if not data or 'orderid' not in data:
-        return jsonify({'status': False, 'message': 'orderid is required'}), 400
-    return jsonify(client.modify_order(data))
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+            
+        data = request.json or {}
+        if 'orderid' not in data:
+            return jsonify({'success': False, 'message': 'orderid is required'}), 400
+            
+        response = client.modify_order(data)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error modifying order: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/order/cancel', methods=['POST'])
+@bp.route('/order/cancel', methods=['POST', 'OPTIONS'])
 def cancel_order():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    data = request.json
-    if not data or 'orderid' not in data:
-        return jsonify({'status': False, 'message': 'orderid is required'}), 400
-    return jsonify(client.cancel_order(data['orderid'], data.get('variety', 'NORMAL')))
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+            
+        data = request.json or {}
+        if 'orderid' not in data:
+            return jsonify({'success': False, 'message': 'orderid is required'}), 400
+            
+        response = client.cancel_order(data['orderid'], data.get('variety', 'NORMAL'))
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error cancelling order: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/ltp', methods=['GET'])
+@bp.route('/ltp', methods=['GET', 'OPTIONS'])
 def get_ltp():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    exchange = request.args.get('exchange', 'NSE')
-    symbol = request.args.get('symbol')
-    token = request.args.get('token')
-    
-    if not symbol or not token:
-        return jsonify({'status': False, 'message': 'symbol and token are required'}), 400
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+            
+        exchange = request.args.get('exchange', 'NSE')
+        symbol = request.args.get('symbol')
+        token = request.args.get('token')
         
-    return jsonify(client.get_ltp(exchange, symbol, token))
+        if not symbol or not token:
+            return jsonify({'success': False, 'message': 'symbol and token are required'}), 400
+            
+        response = client.get_ltp(exchange, symbol, token)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching LTP: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/history', methods=['GET'])
+@bp.route('/history', methods=['GET', 'OPTIONS'])
 def get_history():
-    client = get_api_client()
-    if not client: return jsonify({'status': False, 'message': 'Client error'}), 500
-    params = {
-        'exchange': request.args.get('exchange', 'NSE'),
-        'symboltoken': request.args.get('token'),
-        'interval': request.args.get('interval', 'ONE_MINUTE'),
-        'fromdate': request.args.get('fromdate'),
-        'todate': request.args.get('todate')
-    }
-    if not params['symboltoken'] or not params['fromdate'] or not params['todate']:
-        return jsonify({'status': False, 'message': 'token, fromdate, todate are required'}), 400
-        
-    return jsonify(client.get_historical_data(params))
+    try:
+        client = get_api_client()
+        if not client: 
+            return jsonify({'success': False, 'error': 'auth_error', 'message': 'Broker session expired'}), 401
+            
+        params = {
+            'exchange': request.args.get('exchange', 'NSE'),
+            'symboltoken': request.args.get('token'),
+            'interval': request.args.get('interval', 'ONE_MINUTE'),
+            'fromdate': request.args.get('fromdate'),
+            'todate': request.args.get('todate')
+        }
+        if not params['symboltoken'] or not params['fromdate'] or not params['todate']:
+            return jsonify({'success': False, 'message': 'token, fromdate, todate are required'}), 400
+            
+        response = client.get_historical_data(params)
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error fetching history: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500

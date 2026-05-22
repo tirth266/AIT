@@ -20,6 +20,27 @@ if current_dir not in sys.path:
 # Load environment variables
 load_dotenv()
 
+def validate_environment():
+    """Validate critical environment variables on startup."""
+    critical_vars = [
+        "JWT_SECRET_KEY", 
+        "FRONTEND_ORIGIN", 
+        "MONGO_URI",
+        "REDIS_URL"
+    ]
+    
+    missing_vars = [var for var in critical_vars if not os.environ.get(var)]
+    
+    if missing_vars:
+        logger.error(f"CRITICAL ERROR: Missing environment variables: {', '.join(missing_vars)}")
+        logger.warning("Application might not function correctly.")
+        # In a strict production environment, we might want to raise an exception here:
+        # raise ValueError(f"Missing required environment variables: {missing_vars}")
+    else:
+        logger.info("Environment variable validation passed.")
+
+validate_environment()
+
 try:
     from app import create_app, socketio
     app = create_app()

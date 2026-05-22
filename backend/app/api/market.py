@@ -19,21 +19,14 @@ bp = Blueprint('market', __name__)
 def get_candles():
     """
     Get OHLCV candle data.
-    
-    Query Parameters:
-        - symbol: Trading symbol (e.g., RELIANCE, NIFTY50)
-        - timeframe: Timeframe (1m, 3m, 5m, 15m, 30m, 1h, 2h, 4h, 1d)
-        - limit: Number of candles (default 100, max 1000)
-    
-    Returns:
-        List of candles
     """
     symbol = request.args.get('symbol', 'RELIANCE')
     timeframe = request.args.get('timeframe', '1h')
     limit = min(int(request.args.get('limit', 100)), 1000)
     
     try:
-        candles = market_data_engine.get_candles(symbol, timeframe, limit)
+        engine = get_market_engine()
+        candles = engine.get_candles(symbol, timeframe, limit) if engine else []
         return jsonify({
             'success': True,
             'data': {
@@ -45,65 +38,59 @@ def get_candles():
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to fetch candles: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to fetch candle data'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/current-candle', methods=['GET'])
 def get_current_candle():
     """
     Get current (in-progress) candle.
-    
-    Query Parameters:
-        - symbol: Trading symbol
-        - timeframe: Timeframe
-    
-    Returns:
-        Current candle data
     """
     symbol = request.args.get('symbol', 'RELIANCE')
     timeframe = request.args.get('timeframe', '1m')
     
     try:
-        candle = market_data_engine.get_current_candle(symbol.upper(), timeframe)
+        engine = get_market_engine()
+        candle = engine.get_current_candle(symbol.upper(), timeframe) if engine else None
         return jsonify({
             'success': True,
             'data': candle,
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get current candle: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to get current candle'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/quotes', methods=['GET', 'OPTIONS'])
 def get_quotes():
     """
     Get current quotes for multiple symbols.
-    
-    Query Parameters:
-        - symbols: Comma-separated symbols (e.g., RELIANCE,TCS,INFY)
-    
-    Returns:
-        List of quote data
     """
     symbols = request.args.get('symbols', 'RELIANCE,TCS,INFY,HDFCBANK,ICICIBANK').split(',')
     symbols = [s.strip().upper() for s in symbols if s.strip()]
     
     try:
+        engine = get_market_engine()
         quotes = []
-        for symbol in symbols:
-            tick = market_data_engine.get_tick(symbol)
-            if tick:
-                quotes.append(tick)
+        if engine:
+            for symbol in symbols:
+                tick = engine.get_tick(symbol)
+                if tick:
+                    quotes.append(tick)
         
         return jsonify({
             'success': True,
@@ -112,31 +99,31 @@ def get_quotes():
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to fetch quotes: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to fetch quotes'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/quote/<symbol>', methods=['GET'])
 def get_quote(symbol):
     """
     Get current quote for a symbol.
-    
-    Returns:
-        Quote data
     """
     symbol = symbol.upper()
     
     try:
-        tick = market_data_engine.get_tick(symbol)
+        engine = get_market_engine()
+        tick = engine.get_tick(symbol) if engine else None
         if not tick:
             return jsonify({
                 'success': False,
                 'error': 'symbol_not_found',
-                'message': f'Symbol {symbol} not found'
+                'message': f'Symbol {symbol} not found or no data available'
             }), 404
         
         return jsonify({
@@ -145,29 +132,26 @@ def get_quote(symbol):
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get quote: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': f'Failed to get quote for {symbol}'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/symbols', methods=['GET'])
 def list_symbols():
     """
     List available trading symbols.
-    
-    Query Parameters:
-        - type: 'all', 'stocks', or 'indices' (default 'all')
-    
-    Returns:
-        List of symbols
     """
     filter_type = request.args.get('type', 'all')
     
     try:
-        symbols = market_data_engine.get_symbols(filter_type)
+        engine = get_market_engine()
+        symbols = engine.get_symbols(filter_type) if engine else []
         return jsonify({
             'success': True,
             'data': symbols,
@@ -175,26 +159,26 @@ def list_symbols():
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to list symbols: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to list symbols'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/symbol-info/<symbol>', methods=['GET'])
 def get_symbol_info(symbol):
     """
     Get symbol information.
-    
-    Returns:
-        Symbol metadata
     """
     symbol = symbol.upper()
     
     try:
-        info = market_data_engine.get_symbol_info(symbol)
+        engine = get_market_engine()
+        info = engine.get_symbol_info(symbol) if engine else None
         if not info:
             return jsonify({
                 'success': False,
@@ -208,35 +192,31 @@ def get_symbol_info(symbol):
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get symbol info: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': f'Failed to get info for {symbol}'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/depth/<symbol>', methods=['GET'])
 def get_market_depth(symbol):
     """
     Get market depth / order book for a symbol.
-    
-    Query Parameters:
-        - symbol: Trading symbol
-        - limit: Depth levels (default 10)
-    
-    Returns:
-        Order book data
     """
     symbol = symbol.upper()
     
     try:
-        depth = market_data_engine.get_depth(symbol)
+        engine = get_market_engine()
+        depth = engine.get_depth(symbol) if engine else None
         if not depth:
             return jsonify({
                 'success': False,
                 'error': 'symbol_not_found',
-                'message': f'Symbol {symbol} not found'
+                'message': f'Symbol {symbol} depth not found'
             }), 404
         
         return jsonify({
@@ -245,29 +225,26 @@ def get_market_depth(symbol):
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get depth: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': f'Failed to get depth for {symbol}'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/indicators/<symbol>', methods=['GET'])
 def get_indicators(symbol):
     """
     Get technical indicators for a symbol.
-    
-    Query Parameters:
-        - symbol: Trading symbol
-    
-    Returns:
-        Technical indicators (EMA, RSI, MACD, VWAP, Supertrend, Bollinger Bands, ATR)
     """
     symbol = symbol.upper()
     
     try:
-        indicators = market_data_engine.get_indicators(symbol)
+        engine = get_market_engine()
+        indicators = engine.get_indicators(symbol) if engine else None
         if not indicators:
             return jsonify({
                 'success': False,
@@ -281,104 +258,110 @@ def get_indicators(symbol):
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get indicators: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': f'Failed to get indicators for {symbol}'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/status', methods=['GET'])
 def get_market_status():
     """
     Get current market status.
-    
-    Returns:
-        Market status (open, closed, session)
     """
     try:
-        status = market_data_engine.get_market_status()
+        engine = get_market_engine()
+        status = engine.get_market_status() if engine else {}
         return jsonify({
             'success': True,
             'data': status,
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get market status: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to get market status'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/overview', methods=['GET'])
 def get_market_overview():
     """
     Get market overview with indices and top movers.
-    
-    Returns:
-        Market overview data
     """
     try:
-        indices_symbols = ['NIFTY50', 'BANKNIFTY', 'SENSEX']
+        engine = get_market_engine()
         indices = []
+        gainers = []
+        losers = []
+        status = {}
         
-        for symbol in indices_symbols:
-            tick = market_data_engine.get_tick(symbol)
-            if tick:
-                indices.append({
-                    'symbol': symbol,
-                    'value': tick.get('ltp', 0),
-                    'change': tick.get('change', 0),
-                    'change_percent': tick.get('change_percent', 0)
-                })
-        
-        all_ticks = market_data_engine.get_all_ticks()
-        stocks = [t for t in all_ticks if not t.get('symbol', '').endswith(('50', 'BANK', 'SENSEX'))]
-        
-        sorted_by_change = sorted(stocks, key=lambda x: x.get('change_percent', 0), reverse=True)
-        
-        gainers = sorted_by_change[:5]
-        losers = sorted_by_change[-5:][::-1]
-        
+        if engine:
+            indices_symbols = ['NIFTY50', 'BANKNIFTY', 'SENSEX']
+            
+            for symbol in indices_symbols:
+                tick = engine.get_tick(symbol)
+                if tick:
+                    indices.append({
+                        'symbol': symbol,
+                        'value': tick.get('ltp', 0),
+                        'change': tick.get('change', 0),
+                        'change_percent': tick.get('change_percent', 0)
+                    })
+            
+            all_ticks = engine.get_all_ticks()
+            stocks = [t for t in all_ticks if not t.get('symbol', '').endswith(('50', 'BANK', 'SENSEX'))]
+            
+            sorted_by_change = sorted(stocks, key=lambda x: x.get('change_percent', 0), reverse=True)
+            
+            gainers = sorted_by_change[:5]
+            losers = sorted_by_change[-5:][::-1]
+            status = engine.get_market_status()
+            
         return jsonify({
             'success': True,
             'data': {
                 'indices': indices,
                 'top_gainers': gainers,
                 'top_losers': losers,
-                'market_status': market_data_engine.get_market_status()
+                'market_status': status
             },
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get market overview: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to get market overview'
-        }), 502
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/watchlist', methods=['GET'])
 def get_watchlist_quotes():
     """
     Get quotes for default watchlist symbols.
-    
-    Returns:
-        List of watchlist quotes
     """
     default_symbols = ['RELIANCE', 'TCS', 'INFY', 'HDFCBANK', 'ICICIBANK', 'SBIN', 'KOTAKBANK', 'LT', 'ITC', 'BHARTIARTL']
     
     try:
         engine = get_market_engine()
         quotes = []
-        for symbol in default_symbols:
-            tick = engine.get_tick(symbol)
-            if tick:
-                quotes.append(tick)
+        if engine:
+            for symbol in default_symbols:
+                tick = engine.get_tick(symbol)
+                if tick:
+                    quotes.append(tick)
         
         return jsonify({
             'success': True,
@@ -387,9 +370,11 @@ def get_watchlist_quotes():
             'timestamp': datetime.utcnow().isoformat()
         }), 200
     except Exception as e:
+        import traceback
         logger.error(f"Failed to get watchlist: {e}")
+        logger.error(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': 'market_data_error',
-            'message': 'Failed to get watchlist'
-        }), 502
+            'message': str(e)
+        }), 500
