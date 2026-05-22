@@ -1,43 +1,68 @@
-import React, { useState } from 'react';
-import { useAuthStore } from '../store/auth.store';
-import { loginToAngelOne } from '../api/angelone';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAngelAuthStore } from '../broker/angelone/store/angelAuth.store';
+import { tokenUtils } from '../broker/angelone/utils/token';
 
 export const AngelOneLoginForm: React.FC = () => {
+  const navigate = useNavigate();
   const [clientCode, setClientCode] = useState('');
   const [password, setPassword] = useState('');
   const [totp, setTotp] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  const { 
+    login, 
+    isAuthenticated, 
+    isLoading, 
+    error, 
+    setError 
+  } = useAngelAuthStore();
+
   const [showPassword, setShowPassword] = useState(false);
 
-  const setAuth = useAuthStore((state) => state.setAuth);
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[Login] Already authenticated, redirecting to dashboard');
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-
-    // Payload exactly matches what backend expects: client_code, password, totp
-    const response = await loginToAngelOne({
-      client_code: clientCode,
-      password: password,
-      totp: totp,
-    });
-
-    if (response.success && response.data) {
-      setAuth({
-        jwtToken: response.data.jwt_token,
-        feedToken: response.data.feed_token,
-        clientCode: clientCode,
-      });
-      // Handle success (e.g., redirect or show toast)
-      console.log('Login successful');
-    } else {
-      setError(response.message || 'Login failed');
-    }
+    console.log('[Login] Starting login for:', clientCode);
     
-    setIsLoading(false);
+    try {
+      await login({
+        client_code: clientCode,
+        password: password,
+        totp: totp,
+      });
+
+      // We check isAuthenticated from the store state after login
+      // Note: Since login is async and updates the store, we might need to check the result differently 
+      // or rely on the useEffect above. To be safe, we'll log here.
+      console.log('[Login] Login attempt completed');
+    } catch (err: any) {
+      console.error('[Login] Login failed:', err);
+      setError(err.message || 'Login failed');
+    }
   };
+
+  // Listen for changes in isAuthenticated to trigger navigation immediately
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[Login] Authentication detected, navigating to dashboard');
+      
+      // Also ensure access_token is set for wsManager compatibility if needed
+      const token = tokenUtils.getJwtToken();
+      if (token) {
+        localStorage.setItem('access_token', token);
+        console.log('[Login] Syncing access_token for WebSocket');
+      }
+      
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
 
   return (
     <div className="w-full max-w-md p-8 space-y-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-100 dark:border-gray-700">

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { tokenUtils } from '../utils/token';
 import { AngelUserProfile, AngelCredentials } from '../types';
 import { authApi } from '../api';
+import { useAuthStore } from '../../../store/auth.store';
 
 interface AngelAuthState {
   isAuthenticated: boolean;
@@ -23,17 +24,29 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
   error: null,
 
   login: async (credentials) => {
+    console.log('[AngelAuthStore] Starting login...');
     set({ isLoading: true, error: null });
     try {
       const response = await authApi.login(credentials);
+      console.log('[AngelAuthStore] Login response received');
+      
       const { jwt_token, refresh_token, feed_token } = response.data.data;
       
       tokenUtils.setJwtToken(jwt_token);
       tokenUtils.setRefreshToken(refresh_token);
       tokenUtils.setFeedToken(feed_token);
       
+      // Also update the general auth store for axios interceptors
+      useAuthStore.getState().setAuth({
+        jwtToken: jwt_token,
+        feedToken: feed_token,
+        clientCode: credentials.client_code
+      });
+      
       set({ isAuthenticated: true, isLoading: false });
+      console.log('[AngelAuthStore] Login successful and stores updated');
     } catch (error: any) {
+      console.error('[AngelAuthStore] Login failed:', error);
       set({ 
         error: error.response?.data?.message || 'Login failed', 
         isLoading: false,

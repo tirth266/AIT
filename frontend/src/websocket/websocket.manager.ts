@@ -109,21 +109,24 @@ class WebSocketManager {
   }
 
   private getToken(): string | null {
-    let token = localStorage.getItem('access_token')
+    const angelToken = localStorage.getItem('angel_jwt_token');
+    const accessToken = localStorage.getItem('access_token');
+    const token = angelToken || accessToken;
+
     if (token) {
-      console.log('[WS] Token loaded from localStorage')
-      return token
+      console.log('[WS] Token loaded from storage');
+      return token;
     }
 
     if (import.meta.env.DEV) {
-      console.log('[WS] DEV mode: using placeholder token for development')
-      token = 'dev_token_placeholder'
-      localStorage.setItem('access_token', token)
-      return token
+      console.log('[WS] DEV mode: using placeholder token for development');
+      const devToken = 'dev_token_placeholder';
+      localStorage.setItem('access_token', devToken);
+      return devToken;
     }
 
-    console.warn('[WS] No access token found - please login first')
-    return null
+    console.warn('[WS] No access token found - please login first');
+    return null;
   }
 
   public initAuth(token: string): void {

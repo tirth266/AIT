@@ -48,17 +48,19 @@ export const DEFAULT_DASHBOARD_SUMMARY: DashboardSummary = {
 };
 
 export const normalizeDashboardSummary = (raw: any): DashboardSummary => {
+  if (!raw) return DEFAULT_DASHBOARD_SUMMARY;
+
   return {
     account: {
-      total_balance: safeNumber(raw?.account?.total_balance),
-      available_cash: safeNumber(raw?.account?.available_cash),
-      used_margin: safeNumber(raw?.account?.used_margin),
-      currency: safeString(raw?.account?.currency, 'INR'),
+      total_balance: safeNumber(raw?.account?.total_balance ?? raw?.balance),
+      available_cash: safeNumber(raw?.account?.available_cash ?? raw?.balance),
+      used_margin: safeNumber(raw?.account?.used_margin ?? raw?.used_margin),
+      currency: safeString(raw?.account?.currency ?? raw?.currency, 'INR'),
     },
     today: {
-      pnl: safeNumber(raw?.today?.pnl),
-      pnl_percent: safeNumber(raw?.today?.pnl_percent),
-      trades: safeNumber(raw?.today?.trades),
+      pnl: safeNumber(raw?.today?.pnl ?? raw?.pnl_today),
+      pnl_percent: safeNumber(raw?.today?.pnl_percent ?? (raw?.pnl_today_percent || 0)),
+      trades: safeNumber(raw?.today?.trades ?? raw?.trades_today),
       buy_trades: safeNumber(raw?.today?.buy_trades),
       sell_trades: safeNumber(raw?.today?.sell_trades),
       winning_trades: safeNumber(raw?.today?.winning_trades),
@@ -66,16 +68,16 @@ export const normalizeDashboardSummary = (raw: any): DashboardSummary => {
       win_rate: safeNumber(raw?.today?.win_rate),
     },
     positions: {
-      open: safeNumber(raw?.positions?.open),
+      open: safeNumber(raw?.positions?.open ?? raw?.open_positions),
       total_value: safeNumber(raw?.positions?.total_value),
-      unrealized_pnl: safeNumber(raw?.positions?.unrealized_pnl),
+      unrealized_pnl: safeNumber(raw?.positions?.unrealized_pnl ?? raw?.unrealized_pnl),
     },
     orders: {
       pending: safeNumber(raw?.orders?.pending),
       executed_today: safeNumber(raw?.orders?.executed_today),
     },
     strategies: {
-      active: safeNumber(raw?.strategies?.active),
+      active: safeNumber(raw?.strategies?.active ?? raw?.active_strategies),
       paused: safeNumber(raw?.strategies?.paused),
     },
     alerts: {

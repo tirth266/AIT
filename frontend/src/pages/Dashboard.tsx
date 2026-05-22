@@ -251,18 +251,21 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const { isAuthenticated, refreshAll } = useAngelOne()
   
+  console.log('[Dashboard] Rendering. Authenticated:', isAuthenticated);
+
   // Granular store selectors
   const mode = useTradingStore(state => state.mode)
   const { positions, bots, trades } = useTradingStore(useShallow(state => ({
-    positions: state.positions,
-    bots: state.bots,
-    trades: state.trades,
+    positions: state.positions || [],
+    bots: state.bots || [],
+    trades: state.trades || [],
   })))
   
-  const { summary, funds, isLoading } = useDashboardStore(useShallow(state => ({
+  const { summary, funds, isLoading, error } = useDashboardStore(useShallow(state => ({
     summary: state.summary,
     funds: state.funds,
     isLoading: state.isLoading,
+    error: state.error,
   })))
   const fetchSummary = useDashboardStore(state => state.fetchSummary)
   const fetchFunds = useDashboardStore(state => state.fetchFunds)
@@ -270,7 +273,7 @@ export function DashboardPage() {
 
   const { activeWatchlist, watchlistQuotes } = useWatchlistStore(useShallow(state => ({
     activeWatchlist: state.activeWatchlist,
-    watchlistQuotes: state.quotes,
+    watchlistQuotes: state.quotes || {},
   })))
   const fetchWatchlists = useWatchlistStore(state => state.fetchWatchlists)
 
@@ -283,20 +286,33 @@ export function DashboardPage() {
   const data = mockDashboardData
 
   useEffect(() => {
-    fetchSummary()
-    fetchFunds()
-    fetchPositions()
-    fetchWatchlists()
+    console.log('[Dashboard] Mounting. Fetching data...');
     
-    if (isAuthenticated) {
-      refreshAll()
-    }
+    const initDashboard = async () => {
+      try {
+        await Promise.all([
+          fetchSummary(),
+          fetchFunds(),
+          fetchPositions(),
+          fetchWatchlists()
+        ]);
+        
+        if (isAuthenticated) {
+          console.log('[Dashboard] Authenticated, refreshing broker data');
+          await refreshAll();
+        }
+      } catch (err) {
+        console.error('[Dashboard] Error during initialization:', err);
+      }
+    };
+
+    initDashboard();
   }, [fetchSummary, fetchFunds, fetchPositions, fetchWatchlists, isAuthenticated, refreshAll])
 
-  const modeData = useMemo(() => funds?.balance.total_balance || data.account.paper_balance, [funds, data.account.paper_balance])
+  const modeData = useMemo(() => funds?.balance?.total_balance || data.account.paper_balance, [funds, data.account.paper_balance])
   const indices = mockIndices
 
-  const watchlistData = useMemo(() => activeWatchlist?.symbols.map(symbol => {
+  const watchlistData = useMemo(() => activeWatchlist?.symbols?.map(symbol => {
     const quote = watchlistQuotes[symbol]
     return {
       symbol,
@@ -306,9 +322,36 @@ export function DashboardPage() {
     }
   }) || mockWatchlist, [activeWatchlist, watchlistQuotes])
 
-  const displayPositions = useMemo(() => positions.length > 0 ? positions : mockPositions, [positions])
-  const displayBots = useMemo(() => bots.length > 0 ? bots : mockBots, [bots])
-  const displayTrades = useMemo(() => trades.length > 0 ? trades.slice(0, 10) : mockTrades.slice(0, 10), [trades])
+  const displayPositions = useMemo(() => (positions && positions.length > 0) ? positions : mockPositions, [positions])
+  const displayBots = useMemo(() => (bots && bots.length > 0) ? bots : mockBots, [bots])
+  const displayTrades = useMemo(() => (trades && trades.length > 0) ? trades.slice(0, 10) : mockTrades.slice(0, 10), [trades])
+
+  if (isLoading && !summary?.account?.total_balance) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
+        <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <p className="text-[#8B949E] animate-pulse">Initializing trading dashboard...</p>
+      </div>
+    );
+  }
+
+  if (error && !summary?.account?.total_balance) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4 text-center">
+        <div className="p-4 bg-red-900/20 text-red-400 rounded-lg border border-red-900/50 max-w-md">
+          <h3 className="text-lg font-bold mb-2">Dashboard Error</h3>
+          <p>{error}</p>
+          <Button 
+            className="mt-4" 
+            variant="outline" 
+            onClick={() => window.location.reload()}
+          >
+            Retry Connection
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

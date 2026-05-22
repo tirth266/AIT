@@ -12,6 +12,35 @@ export const api = axios.create({
   withCredentials: true,
 })
 
+// Add a request interceptor to include the JWT token in all requests
+api.interceptors.request.use(
+  (config) => {
+    // Try to get token from multiple possible sources for robustness
+    const angelToken = localStorage.getItem('angel_jwt_token');
+    const accessToken = localStorage.getItem('access_token');
+    const token = angelToken || accessToken;
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      console.warn('[API] Unauthorized access detected, redirecting to login');
+      // Optional: Clear tokens and redirect
+      // localStorage.removeItem('angel_jwt_token');
+      // window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const watchlistApi = {
   list: (params?: { page?: number; limit?: number }) => api.get('/watchlists', { params }),
   get: (id: string) => api.get(`/watchlists/${id}`),
@@ -185,7 +214,7 @@ export const backtestApi = {
 }
 
 export const dashboardApi = {
-  summary: () => api.get('/dashboard/summary'),
+  summary: () => api.get('/dashboard'),
   performance: (params?: { period?: string }) => api.get('/dashboard/performance', { params }),
   watchlist: (params?: { watchlist_id?: string }) => api.get('/dashboard/watchlist', { params }),
   marketOverview: () => api.get('/dashboard/market-overview'),

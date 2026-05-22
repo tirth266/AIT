@@ -13,24 +13,111 @@ import { BotsPage } from './pages/Bots';
 import { BacktestPage } from './pages/Backtest';
 import { LogsPage } from './pages/Logs';
 
+import { ProtectedRoute } from './components/ProtectedRoute';
+
 function App() {
+  console.log('[App] Rendering App');
   return (
     <div className="App font-sans antialiased">
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LoginPage />} />
-          <Route path="/dashboard" element={<DashboardPage />} />
-          <Route path="/market" element={<MarketPage />} />
-          <Route path="/notifications" element={<NotificationsPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/strategies" element={<StrategiesPage />} />
-          <Route path="/strategies/new" element={<StrategyEditorPage />} />
-          <Route path="/strategies/:strategyId" element={<StrategyEditorPage />} />
-          <Route path="/trades" element={<TradesPage />} />
-          <Route path="/wallet" element={<WalletPage />} />
-          <Route path="/bots" element={<BotsPage />} />
-          <Route path="/backtest" element={<BacktestPage />} />
-          <Route path="/logs" element={<LogsPage />} />
+          <Route 
+            path="/dashboard" 
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/market" 
+            element={
+              <ProtectedRoute>
+                <MarketPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/notifications" 
+            element={
+              <ProtectedRoute>
+                <NotificationsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/settings" 
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/strategies" 
+            element={
+              <ProtectedRoute>
+                <StrategiesPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/strategies/new" 
+            element={
+              <ProtectedRoute>
+                <StrategyEditorPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/strategies/:strategyId" 
+            element={
+              <ProtectedRoute>
+                <StrategyEditorPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/trades" 
+            element={
+              <ProtectedRoute>
+                <TradesPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/wallet" 
+            element={
+              <ProtectedRoute>
+                <WalletPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/bots" 
+            element={
+              <ProtectedRoute>
+                <BotsPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/backtest" 
+            element={
+              <ProtectedRoute>
+                <BacktestPage />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/logs" 
+            element={
+              <ProtectedRoute>
+                <LogsPage />
+              </ProtectedRoute>
+            } 
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>
