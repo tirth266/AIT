@@ -41,6 +41,9 @@ def validate_environment():
 
 validate_environment()
 
+# Debug print to verify API key is loading
+print("ANGEL_API_KEY:", os.getenv("ANGEL_API_KEY"))
+
 try:
     from app import create_app, socketio
     app = create_app()
