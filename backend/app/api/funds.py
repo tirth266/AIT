@@ -20,45 +20,58 @@ bp = Blueprint('funds', __name__)
 def get_funds():
     """
     Get user's funds and balance information.
-
-    Returns:
-        Fund details with balance breakdown
     """
-    user_id = "default_user"
+    try:
+        user_id = "default_user"
+        logger.info(f"[Funds] Fetching funds for {user_id}")
 
-    db = get_db()
-    if not db:
-        return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
+        db = get_db()
+        if not db:
+            logger.error("[Funds] Database connection missing")
+            return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
-    funds = db.funds.find_one({'user_id': user_id})
+        funds = db.funds.find_one({'user_id': user_id})
 
-    if not funds:
-        initial_balance = 100000.0
-        funds = {
-            'user_id': user_id,
-            'balance': initial_balance,
-            'available_balance': initial_balance,
-            'used_margin': 0,
-            'pending_balance': 0,
-            'realized_pnl': 0,
-            'unrealized_pnl': 0,
-            'total_deposited': initial_balance,
-            'total_withdrawn': 0,
-            'mode': 'paper',
-            'currency': 'INR',
-            'created_at': datetime.utcnow(),
-            'updated_at': datetime.utcnow()
-        }
-        db.funds.insert_one(funds)
-        funds['_id'] = str(funds['_id'])
-    else:
-        funds['_id'] = str(funds['_id'])
-        if 'created_at' in funds:
-            funds['created_at'] = funds['created_at'].isoformat()
-        if 'updated_at' in funds:
-            funds['updated_at'] = funds['updated_at'].isoformat()
+        if not funds:
+            initial_balance = 100000.0
+            funds = {
+                'user_id': user_id,
+                'balance': initial_balance,
+                'available_balance': initial_balance,
+                'used_margin': 0,
+                'pending_balance': 0,
+                'realized_pnl': 0,
+                'unrealized_pnl': 0,
+                'total_deposited': initial_balance,
+                'total_withdrawn': 0,
+                'mode': 'paper',
+                'currency': 'INR',
+                'created_at': datetime.utcnow(),
+                'updated_at': datetime.utcnow()
+            }
+            db.funds.insert_one(funds)
+            funds['_id'] = str(funds['_id'])
+        else:
+            funds['_id'] = str(funds['_id'])
+            if 'created_at' in funds:
+                funds['created_at'] = funds['created_at'].isoformat() if hasattr(funds['created_at'], 'isoformat') else str(funds['created_at'])
+            if 'updated_at' in funds:
+                funds['updated_at'] = funds['updated_at'].isoformat() if hasattr(funds['updated_at'], 'isoformat') else str(funds['updated_at'])
 
-    return jsonify(funds), 200
+        return jsonify({
+            "success": True,
+            "data": funds
+        }), 200
+
+    except Exception as e:
+        import traceback
+        logger.error(f"[Funds] Critical failure: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': 'internal_error',
+            'message': str(e)
+        }), 500
 
 
 @bp.route('', methods=['POST'])

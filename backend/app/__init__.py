@@ -10,7 +10,12 @@ from flask import Flask, jsonify
 from flask_socketio import SocketIO
 from flask_cors import CORS
 
+from flask_jwt_extended import JWTManager
 from .config import config
+from .extensions import init_extensions
+
+# Global JWT instance
+jwt = JWTManager()
 
 # Initialize SocketIO globally with production CORS settings
 socketio = SocketIO(
@@ -43,6 +48,9 @@ def create_app(config_name: str = None) -> Flask:
     except Exception as e:
         print(f"Config loading failed: {e}")
 
+    # Initialize JWT
+    jwt.init_app(app)
+
     # Mandatory implementations: Root and Ping routes
     @app.route("/")
     def home():
@@ -61,32 +69,54 @@ def create_app(config_name: str = None) -> Flask:
     def favicon():
         return '', 204
 
+    @app.route("/api/v1/debug/session")
+    def debug_session():
+        """Unprotected debug endpoint to check server state."""
+        from .database.connection import get_db
+        db_status = "connected" if get_db() is not None else "disconnected"
+        return jsonify({
+            "db_status": db_status,
+            "env": os.environ.get('FLASK_ENV', 'unknown'),
+            "frontend_origin": os.environ.get("FRONTEND_ORIGIN", "not set")
+        })
+
     # Robust global exception handler
     @app.errorhandler(Exception)
     def handle_exception(e):
         import traceback
+        print("==== BACKEND ERROR ====")
+        print(str(e))
         traceback.print_exc()
         return jsonify({
             "success": False,
-            "error": str(e)
+            "error": str(e),
+            "type": type(e).__name__
         }), 500
 
     # SocketIO will be initialized with the app
     socketio.init_app(app)
 
-    # All CORS and Preflight logic is handled in the middleware
+    # Deferred imports for blueprints and services to prevent startup crashes
     try:
+        # Initialize database and other extensions
+        init_extensions(app)
+        print("[OK] Extensions initialized")
+
         from .middleware import register_middleware
         register_middleware(app)
         print("[OK] Middleware registered")
     except Exception as e:
         print(f"[ERROR] Middleware registration failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     try:
         register_blueprints(app)
         print("[OK] Blueprints registered")
     except Exception as e:
         print(f"[ERROR] Blueprint registration failed: {e}")
+        import traceback
+        traceback.print_exc()
 
     print("Application initialized successfully")
     return app

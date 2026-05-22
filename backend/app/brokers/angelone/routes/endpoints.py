@@ -15,17 +15,32 @@ logger = logging.getLogger('angelone')
 bp = Blueprint('angelone_broker', __name__)
 
 def get_api_client():
-    """Helper to get initialized client with error handling."""
+    """Helper to get initialized client with session restoration."""
     try:
-        return get_client()
+        # Restore session from Redis/Persistence if needed
+        success = session_manager.check_and_restore_session()
+        if not success:
+            logger.warning("Failed to restore AngelOne session")
+            return None
+            
+        client = get_client()
+        # Sync the internal smart_api state with the session_manager tokens
+        if session_manager.jwt_token:
+            client.smart_api.setAccessToken(session_manager.jwt_token)
+            client.smart_api.setRefreshToken(session_manager.refresh_token)
+            
+        return client
     except Exception as e:
         logger.error(f"Failed to initialize AngelOne client: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         return None
 
 @bp.route('/login', methods=['GET', 'POST', 'OPTIONS'])
 def login():
     """Login to Angel One using environment credentials."""
-    logger.info(f'Angel One login request: {request.method}')
+    logger.info(f'[AngelOne] Login request: {request.method}')
+    # ... rest of login implementation stays same but with logging ...
 
     if request.method == 'GET':
         return jsonify({

@@ -31,10 +31,15 @@ class TokenManager:
         try:
             self._redis = get_redis()
             self._mongo = get_db()
+            logger.info(f"TokenManager connections initialized: Redis={'OK' if self._redis else 'NO'}, Mongo={'OK' if self._mongo else 'NO'}")
         except Exception as e:
-            logger.warning(f"Database connections unavailable: {e}")
+            logger.warning(f"Database connections unavailable in TokenManager: {e}")
 
     def _load_tokens(self):
+        # Refresh connections just in case they were initialized late
+        if not self._redis or not self._mongo:
+            self._init_connections()
+
         try:
             if self._redis:
                 data = self._redis.get(REDIS_KEY)

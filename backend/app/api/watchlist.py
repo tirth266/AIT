@@ -20,29 +20,40 @@ bp = Blueprint('watchlist', __name__)
 def list_watchlists():
     """
     List all watchlists for the user.
-
-    Returns:
-        List of watchlists with symbols
     """
-    user_id = "default_user"
+    try:
+        user_id = "default_user"
+        logger.info(f"[Watchlist] Listing watchlists for {user_id}")
 
-    db = get_db()
-    if not db:
-        return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
+        db = get_db()
+        if not db:
+            logger.error("[Watchlist] Database connection missing")
+            return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
-    watchlists = list(db.watchlists.find({'user_id': user_id}).sort('created_at', -1))
+        watchlists = list(db.watchlists.find({'user_id': user_id}).sort('created_at', -1))
 
-    for wl in watchlists:
-        wl['_id'] = str(wl['_id'])
-        if 'created_at' in wl:
-            wl['created_at'] = wl['created_at'].isoformat()
-        if 'updated_at' in wl:
-            wl['updated_at'] = wl['updated_at'].isoformat()
+        for wl in watchlists:
+            wl['_id'] = str(wl['_id'])
+            if 'created_at' in wl:
+                wl['created_at'] = wl['created_at'].isoformat() if hasattr(wl['created_at'], 'isoformat') else str(wl['created_at'])
+            if 'updated_at' in wl:
+                wl['updated_at'] = wl['updated_at'].isoformat() if hasattr(wl['updated_at'], 'isoformat') else str(wl['updated_at'])
 
-    return jsonify({
-        'watchlists': watchlists,
-        'total': len(watchlists)
-    }), 200
+        return jsonify({
+            "success": True,
+            "data": watchlists,
+            "total": len(watchlists)
+        }), 200
+
+    except Exception as e:
+        import traceback
+        logger.error(f"[Watchlist] Critical failure: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': 'internal_error',
+            'message': str(e)
+        }), 500
 
 
 @bp.route('', methods=['POST'])

@@ -19,69 +19,106 @@ bp = Blueprint('dashboard', __name__)
 def get_dashboard():
     """
     Get dashboard data.
-
-    Query Parameters:
-        - mode: paper or live
-
-    Returns:
-        Dashboard data including balance, positions, stats
     """
-    mode = request.args.get('mode', 'paper')
+    try:
+        logger.info(f"[Dashboard] Request received from {request.remote_addr}")
+        mode = request.args.get('mode', 'paper')
+        logger.info(f"[Dashboard] Mode: {mode}")
 
-    db = get_db()
-    if not db:
-        return jsonify({'error': 'database_error'}), 500
+        db = get_db()
+        if not db:
+            logger.error("[Dashboard] Database connection missing")
+            return jsonify({
+                'success': False,
+                'error': 'database_error',
+                'message': 'Database not connected'
+            }), 500
 
-    setting = db.settings.find_one({'key': 'trading_mode'})
-    current_mode = setting['value'] if setting else 'paper'
-
-    balance = 10000.0
-    if mode == 'paper':
-        paper_balance = db.settings.find_one({'key': 'paper_balance'})
-        balance = float(paper_balance['value']) if paper_balance else 10000.0
-    else:
         try:
-            from app.broker_integrations.factory import BrokerFactory
-            brokers = list(db.brokers.find({'is_connected': True}))
-            if brokers:
-                broker = BrokerFactory.get_broker(brokers[0]['broker_name'])
-                balance_data = broker.get_balance()
-                balance = balance_data.get('total', balance_data.get('free', 0))
-        except Exception:
-            pass
+            setting = db.settings.find_one({'key': 'trading_mode'})
+            current_mode = setting['value'] if setting else 'paper'
+        except Exception as e:
+            logger.warning(f"[Dashboard] Could not fetch trading_mode setting: {e}")
+            current_mode = 'paper'
 
-    open_positions = list(db.positions.find({'status': 'open', 'mode': mode}))
+        balance = 10000.0
+        if mode == 'paper':
+            try:
+                paper_balance = db.settings.find_one({'key': 'paper_balance'})
+                balance = float(paper_balance['value']) if paper_balance else 10000.0
+            except Exception as e:
+                logger.warning(f"[Dashboard] Could not fetch paper_balance: {e}")
+                balance = 10000.0
+        else:
+            try:
+                from app.broker_integrations.factory import BrokerFactory
+                brokers = list(db.brokers.find({'is_connected': True}))
+                if brokers:
+                    broker = BrokerFactory.get_broker(brokers[0]['broker_name'])
+                    balance_data = broker.get_balance()
+                    balance = balance_data.get('total', balance_data.get('free', 0))
+            except Exception as e:
+                logger.error(f"[Dashboard] Broker balance fetch failed: {e}")
+                balance = 0.0
 
-    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    today_trades = list(db.trades.find({
-        'mode': mode,
-        'created_at': {'$gte': today_start}
-    }))
+        try:
+            open_positions = list(db.positions.find({'status': 'open', 'mode': mode}))
+        except Exception as e:
+            logger.error(f"[Dashboard] Positions fetch failed: {e}")
+            open_positions = []
 
-    pnl_today = sum(t.get('pnl', 0) for t in today_trades)
+        try:
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+            today_trades = list(db.trades.find({
+                'mode': mode,
+                'created_at': {'$gte': today_start}
+            }))
+        except Exception as e:
+            logger.error(f"[Dashboard] Today's trades fetch failed: {e}")
+            today_trades = []
 
-    unrealized_pnl = sum(p.get('unrealized_pnl', 0) for p in open_positions)
+        pnl_today = sum(t.get('pnl', 0) for t in today_trades)
+        unrealized_pnl = sum(p.get('unrealized_pnl', 0) for p in open_positions)
 
-    active_strategies = db.strategies.count_documents({'is_active': True, 'mode': mode})
+        try:
+            active_strategies = db.strategies.count_documents({'is_active': True, 'mode': mode})
+        except Exception as e:
+            logger.error(f"[Dashboard] Active strategies count failed: {e}")
+            active_strategies = 0
 
-    last_7_days = datetime.utcnow() - timedelta(days=7)
-    week_trades = list(db.trades.find({
-        'mode': mode,
-        'created_at': {'$gte': last_7_days}
-    }))
-    pnl_week = sum(t.get('pnl', 0) for t in week_trades)
+        try:
+            last_7_days = datetime.utcnow() - timedelta(days=7)
+            week_trades = list(db.trades.find({
+                'mode': mode,
+                'created_at': {'$gte': last_7_days}
+            }))
+            pnl_week = sum(t.get('pnl', 0) for t in week_trades)
+        except Exception as e:
+            logger.error(f"[Dashboard] Week trades fetch failed: {e}")
+            pnl_week = 0.0
 
-    return jsonify({
-        'mode': current_mode,
-        'trading_mode': mode,
-        'balance': balance,
-        'unrealized_pnl': round(unrealized_pnl, 2),
-        'pnl_today': round(pnl_today, 2),
-        'pnl_week': round(pnl_week, 2),
-        'open_positions': len(open_positions),
-        'active_strategies': active_strategies,
-        'trades_today': len(today_trades)
-    }), 200
+        return jsonify({
+            'success': True,
+            'mode': current_mode,
+            'trading_mode': mode,
+            'balance': balance,
+            'unrealized_pnl': round(unrealized_pnl, 2),
+            'pnl_today': round(pnl_today, 2),
+            'pnl_week': round(pnl_week, 2),
+            'open_positions': len(open_positions),
+            'active_strategies': active_strategies,
+            'trades_today': len(today_trades)
+        }), 200
+
+    except Exception as e:
+        import traceback
+        logger.error(f"[Dashboard] Critical failure: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': 'internal_error',
+            'message': str(e)
+        }), 500
 
 
 @bp.route('/performance', methods=['GET'])

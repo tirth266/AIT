@@ -214,18 +214,34 @@ def list_positions():
 @bp.route('/positions/open', methods=['GET', 'OPTIONS'])
 def get_open_positions():
     """Get open positions."""
-    user_id = "default_user"
-    mode = request.args.get('mode', 'paper')
-    
-    position_manager = get_position_manager()
-    positions = position_manager.get_open_positions(user_id)
-    
-    if mode:
-        positions = [p for p in positions if p.mode == mode]
-    
-    return jsonify({
-        'positions': [p.to_dict() for p in positions]
-    }), 200
+    try:
+        user_id = "default_user"
+        mode = request.args.get('mode', 'paper')
+        logger.info(f"[TradingEngine] Fetching open positions for {user_id}, mode={mode}")
+        
+        position_manager = get_position_manager()
+        if not position_manager:
+            logger.error("[TradingEngine] Position manager not available")
+            return jsonify({'success': False, 'message': 'Position manager unavailable'}), 500
+            
+        positions = position_manager.get_open_positions(user_id)
+        
+        if mode:
+            positions = [p for p in positions if p.mode == mode]
+        
+        return jsonify({
+            'success': True,
+            'positions': [p.to_dict() for p in positions]
+        }), 200
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"[TradingEngine] Open positions failure: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 @bp.route('/positions/<position_id>', methods=['GET'])
