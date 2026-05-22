@@ -46,8 +46,9 @@ def login():
     import os
     import pyotp
     from SmartApi import SmartConnect
+    from loguru import logger
 
-    print("==== ANGEL LOGIN START ====")
+    logger.info("=== ANGEL ONE LOGIN REQUEST ===")
 
     if request.method == 'GET':
         return jsonify({
@@ -59,60 +60,78 @@ def login():
 
     try:
         # 1. Parse and Validate Request Payload
-        data = request.get_json(silent=True) or {}
-        print("Incoming Data:", {k: (v if k != 'password' else '***') for k, v in data.items()})
+        data = request.get_json(silent=True)
         
-        clientcode = data.get("clientcode") or data.get("client_code")
-        password = data.get("password")
-        totp_secret = data.get("totp")
-
-        print("Client Code:", clientcode)
-
-        if not clientcode or not password or not totp_secret:
-            print("[AngelOne] Validation Error: Missing credentials")
+        if data is None:
+            logger.error("Login failed: No JSON payload received")
             return jsonify({
                 "success": False,
-                "message": "Missing credentials (clientcode, password, totp)"
+                "error": "MISSING_PAYLOAD",
+                "message": "No JSON payload received. Ensure Content-Type is application/json"
             }), 400
+
+        # Log keys for debugging (omit password/totp values)
+        logger.debug(f"Received payload keys: {list(data.keys())}")
+        
+        # Support both camelCase and snake_case
+        clientcode = data.get("clientcode") or data.get("client_code")
+        password = data.get("password")
+        totp_secret = data.get("totp") or data.get("totp_secret")
+
+        # Detailed validation logging
+        missing_fields = []
+        if not clientcode: missing_fields.append("clientcode")
+        if not password: missing_fields.append("password")
+        if not totp_secret: missing_fields.append("totp")
+
+        if missing_fields:
+            logger.warning(f"Validation Error: Missing fields: {missing_fields}")
+            return jsonify({
+                "success": False,
+                "error": "VALIDATION_FAILED",
+                "message": f"Missing required fields: {', '.join(missing_fields)}",
+                "missing_fields": missing_fields
+            }), 400
+
+        logger.info(f"Attempting login for client: {clientcode}")
 
         # 2. Generate current 6-digit TOTP from secret
         try:
-            current_totp = pyotp.TOTP(totp_secret).now()
-            print("Generated TOTP:", current_totp)
+            current_totp = pyotp.TOTP(totp_secret.replace(" ", "")).now()
+            logger.debug(f"Generated TOTP for {clientcode}")
         except Exception as totp_err:
-            print(f"[AngelOne] TOTP Generation Error: {totp_err}")
+            logger.error(f"TOTP Generation Error: {totp_err}")
             return jsonify({
                 "success": False,
                 "error": "TOTP_GEN_FAILED",
-                "message": "Invalid TOTP secret provided"
+                "message": "Invalid TOTP secret format. Please check your broker security settings."
             }), 400
 
         # 3. Check Environment Configuration
         api_key = os.getenv("ANGEL_API_KEY")
-        print("API KEY EXISTS:", bool(api_key))
-        
         if not api_key:
-            print("[AngelOne] Configuration Error: Missing ANGEL_API_KEY")
+            logger.error("Configuration Error: ANGEL_API_KEY environment variable is not set")
             return jsonify({
                 "success": False,
                 "error": "CONFIG_ERROR",
-                "message": "Server configuration error: Missing API Key"
+                "message": "Server-side configuration error. Please contact administrator."
             }), 500
 
         # 4. Initialize SmartConnect and Generate Session
-        print(f"[AngelOne] Initializing SmartConnect for client: {clientcode}")
+        logger.info(f"Initializing SmartConnect for client: {clientcode}")
         smartApi = SmartConnect(api_key)
         
         try:
-            print(f"[AngelOne] Calling generateSession for {clientcode}...")
+            logger.info(f"Calling SmartAPI generateSession for {clientcode}...")
             session = smartApi.generateSession(clientcode, password, current_totp)
-            print("SESSION RESPONSE:", session)
             
-            if not session.get("status"):
-                print(f"[AngelOne] SmartAPI login failed: {session}")
+            if not session or not session.get("status"):
+                logger.error(f"SmartAPI login failed for {clientcode}: {session}")
                 return jsonify({
                     "success": False,
-                    "message": session
+                    "error": "BROKER_AUTHENTICATION_FAILED",
+                    "message": session.get("message", "Invalid credentials or session expired"),
+                    "details": session
                 }), 401
 
             session_data = session.get('data', {})
@@ -121,11 +140,11 @@ def login():
             feed_token = session_data.get('feedToken')
 
             if not jwt_token:
-                print('[AngelOne] Login succeeded but no JWT token returned')
+                logger.error(f"SmartAPI returned success status but missing jwtToken for {clientcode}")
                 return jsonify({
                     "success": False,
-                    "error": "TOKEN_ERROR",
-                    "message": "Failed to retrieve session tokens from broker"
+                    "error": "TOKEN_RETRIEVAL_FAILED",
+                    "message": "Broker authentication succeeded but failed to retrieve session tokens."
                 }), 500
 
             # 5. Save Session and return success
@@ -137,39 +156,36 @@ def login():
                 client.smart_api = smartApi
                 client.smart_api.setAccessToken(jwt_token)
                 client.smart_api.setRefreshToken(refresh_token)
-            except Exception:
-                pass
+            except Exception as sync_err:
+                logger.warning(f"Failed to sync client singleton: {sync_err}")
 
-            print(f"[AngelOne] Login successful for user: {clientcode}")
+            logger.info(f"Login successful for client: {clientcode}")
 
             return jsonify({
                 'success': True,
                 'message': 'Logged in successfully',
-                'token': jwt_token,
-                'data': session,
-                'tokens': {
+                'data': {
+                    'client_code': clientcode,
                     'jwt_token': jwt_token,
                     'refresh_token': refresh_token,
-                    'feed_token': feed_token,
-                    'client_code': clientcode
+                    'feed_token': feed_token
                 }
             }), 200
 
         except Exception as api_err:
-            print(f"[AngelOne] SmartAPI Exception: {str(api_err)}")
+            logger.exception(f"SmartAPI Exception during generateSession: {api_err}")
             return jsonify({
                 "success": False,
-                "error": "API_CONNECTION_ERROR",
-                "message": f"Broker connection failed: {str(api_err)}"
+                "error": "BROKER_CONNECTION_ERROR",
+                "message": f"Could not connect to broker: {str(api_err)}"
             }), 500
 
     except Exception as e:
-        print("==== LOGIN ERROR ====")
-        print(str(e))
-        traceback.print_exc()
+        logger.exception(f"Unexpected error in login route: {e}")
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'INTERNAL_SERVER_ERROR',
+            'message': 'An unexpected error occurred processing your login request'
         }), 500
 
 @bp.route('/connect', methods=['POST'])

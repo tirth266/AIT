@@ -15,8 +15,7 @@ Author: Staff Engineer
 """
 
 from flask import Flask, request, jsonify, g
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+from ..extensions import limiter
 from functools import wraps
 import logging
 import hashlib
@@ -72,29 +71,19 @@ def init_rate_limiting(app: Flask) -> None:
         logger.warning("Using in-memory rate limiting - NOT RECOMMENDED FOR PRODUCTION")
 
     try:
-        limiter = Limiter(
-            key_func=get_rate_limit_key,
-            storage_uri=ratelimit_storage,
-            default_limits=[app.config.get('RATELIMIT_DEFAULT', '100/minute')],
-            strategy='fixed-window',
-            storage_options={
-                'socket_timeout': 5,
-                'socket_connect_timeout': 5,
-            },
-            headers_enabled=True
-        )
+        # Reconfigure the global limiter instance
+        limiter.key_func = get_rate_limit_key
+        limiter.storage_uri = ratelimit_storage
+        limiter._default_limits = [app.config.get('RATELIMIT_DEFAULT', '100/minute')]
+        
+        # Initialize with app
         limiter.init_app(app)
     except Exception as e:
         logger.error(f"Failed to initialize Flask-Limiter with {ratelimit_storage}: {e}")
         # Final desperate fallback
         if ratelimit_storage != 'memory://':
             logger.warning("Attempting emergency fallback to memory://")
-            limiter = Limiter(
-                key_func=get_rate_limit_key,
-                storage_uri='memory://',
-                default_limits=[app.config.get('RATELIMIT_DEFAULT', '100/minute')],
-                strategy='fixed-window'
-            )
+            limiter.storage_uri = 'memory://'
             limiter.init_app(app)
 
     # Custom rate limit error handler
