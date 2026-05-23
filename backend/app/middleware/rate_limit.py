@@ -15,6 +15,7 @@ Author: Staff Engineer
 """
 
 from flask import Flask, request, jsonify, g
+from flask_limiter import Limiter
 from ..extensions import limiter
 from functools import wraps
 import logging
