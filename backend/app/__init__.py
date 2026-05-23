@@ -8,11 +8,11 @@ import os
 import logging
 from flask import Flask, jsonify
 from flask_socketio import SocketIO
-from flask_cors import CORS
 
 from flask_jwt_extended import JWTManager
 from .config import config
 from .extensions import init_extensions
+from .middleware.cors import init_cors
 
 # Global JWT instance
 jwt = JWTManager()
@@ -41,6 +41,13 @@ def create_app(config_name: str = None) -> Flask:
 
     app = Flask(__name__)
     
+    # Initialize CORS explicitly
+    try:
+        init_cors(app)
+        print("[OK] CORS initialized")
+    except Exception as e:
+        print(f"[CRITICAL] CORS initialization failed: {e}")
+
     # Handle configuration gracefully
     try:
         if config_name in config:
@@ -55,7 +62,7 @@ def create_app(config_name: str = None) -> Flask:
     try:
         from .middleware import register_middleware
         register_middleware(app)
-        print("[OK] Middleware registered (including CORS)")
+        print("[OK] Middleware registered")
     except Exception as e:
         print(f"[CRITICAL] Middleware registration failed: {e}")
         import traceback
