@@ -3,7 +3,7 @@ services:
     name: ait-backend
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT run:app
+    startCommand: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT run:app --log-level debug
     envVars:
       - key: FLASK_ENV
         value: production

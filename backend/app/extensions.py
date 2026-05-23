@@ -31,9 +31,9 @@ def init_extensions(app: Flask) -> None:
     """Initialize all Flask extensions."""
     global mongo_client, mongo_db, redis_client, redis_service
 
-    print("[DEBUG] init_extensions() called")
+    print("[DEBUG] init_extensions() called", flush=True)
     init_mongodb(app)
-    print("[DEBUG] init_mongodb() completed")
+    print("[DEBUG] init_mongodb() completed", flush=True)
     
     init_redis(app)
     init_redis_service(app)
@@ -49,16 +49,16 @@ def init_limiter(app: Flask) -> None:
 
 def init_mongodb(app: Flask) -> None:
     """Initialize MongoDB connection with validation."""
-    print("[MONGO] init_mongodb() entered")  # Must appear in logs
+    print("[MONGO] init_mongodb() entered", flush=True)  # Must appear in logs
     global mongo_client, mongo_db
-    print("\n" + "-"*50)
-    print("  MongoDB Connection")
-    print("-"*50)
+    print("\n" + "-"*50, flush=True)
+    print("  MongoDB Connection", flush=True)
+    print("-"*50, flush=True)
 
     try:
         mongo_uri = app.config.get('MONGO_URI') or os.environ.get("MONGO_URI")
         if not mongo_uri:
-            print("[ERROR] MONGO_URI is not set in app.config or environment!")
+            print("[ERROR] MONGO_URI is not set in app.config or environment!", flush=True)
             logger.error("[MONGO] MONGO_URI is not set!")
             return None
 
@@ -74,7 +74,7 @@ def init_mongodb(app: Flask) -> None:
                 user = prefix.split("://")[1].split(":")[0]
                 log_uri = f"{protocol}://{user}:****@{suffix}"
         
-        print(f"[INFO] Connecting to: {log_uri}")
+        print(f"[INFO] Connecting to: {log_uri}", flush=True)
 
         mongo_client = MongoClient(
             mongo_uri,
@@ -88,7 +88,7 @@ def init_mongodb(app: Flask) -> None:
         
         # Force connection test
         mongo_client.admin.command('ping')
-        print("[OK] MongoDB connected successfully!")
+        print("[OK] MongoDB connected successfully!", flush=True)
         logger.info("[MONGO] MongoDB connected successfully!")
 
         db_name = app.config.get('MONGO_DB_NAME', 'trading_db')
@@ -102,36 +102,36 @@ def init_mongodb(app: Flask) -> None:
 
         logger.info(f"MongoDB database initialized: {db_name}")
     except Exception as e:
-        print(f"[ERROR] MongoDB connection failed: {e}")
+        print(f"[ERROR] MongoDB connection failed: {e}", flush=True)
         logger.error(f"[MONGO] Connection failed: {e}")
-        print("[WARN] Application will run with limited functionality")
+        print("[WARN] Application will run with limited functionality", flush=True)
         mongo_client = None
         mongo_db = None
     
-    print("-"*50 + "\n")
+    print("-"*50 + "\n", flush=True)
 
 
 def init_redis(app: Flask) -> None:
     """Initialize Redis connection with graceful fallback."""
     global redis_client
-    print("\n" + "-"*50)
-    print("  Redis Connection")
-    print("-"*50)
+    print("\n" + "-"*50, flush=True)
+    print("  Redis Connection", flush=True)
+    print("-"*50, flush=True)
 
     try:
         redis_url = app.config.get('REDIS_URL')
         redis_client = redis.from_url(redis_url, decode_responses=True)
         redis_client.ping()
         app.redis = redis_client
-        print(f"[OK] Redis connected: {redis_url}")
+        print(f"[OK] Redis connected: {redis_url}", flush=True)
         logger.info(f"Redis connected: {redis_url}")
     except Exception as e:
-        print(f"[WARN] Redis connection failed: {e}")
-        print("[WARN] Continuing without Redis (local mode)")
+        print(f"[WARN] Redis connection failed: {e}", flush=True)
+        print("[WARN] Continuing without Redis (local mode)", flush=True)
         logger.warning(f"Redis connection failed: {e}")
         redis_client = None
 
-    print("-"*50 + "\n")
+    print("-"*50 + "\n", flush=True)
 
 
 def init_redis_service(app: Flask) -> None:

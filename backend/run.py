@@ -6,6 +6,9 @@ import sys
 import logging
 from dotenv import load_dotenv
 
+# Force unbuffered output
+sys.stdout.reconfigure(line_buffering=True)
+
 # Set up logging for startup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('startup')
@@ -19,6 +22,18 @@ if current_dir not in sys.path:
 
 # Load environment variables
 load_dotenv()
+
+# Standalone MongoDB test before Flask starts
+mongo_uri = os.environ.get("MONGO_URI")
+print(f"[STANDALONE TEST] MONGO_URI present: {bool(mongo_uri)}", flush=True)
+try:
+    from pymongo import MongoClient
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+    client.admin.command("ping")
+    print("[STANDALONE TEST] MongoDB ping SUCCESS", flush=True)
+    client.close()
+except Exception as e:
+    print(f"[STANDALONE TEST] MongoDB ping FAILED: {e}", flush=True)
 
 def validate_environment():
     """Validate critical environment variables on startup."""

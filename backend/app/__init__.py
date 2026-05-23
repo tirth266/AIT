@@ -42,9 +42,9 @@ def check_environment():
     ]
     missing = [var for var in required_vars if not os.environ.get(var)]
     if missing:
-        print(f"[CRITICAL] Missing environment variables: {', '.join(missing)}")
+        print(f"[CRITICAL] Missing environment variables: {', '.join(missing)}", flush=True)
     else:
-        print("[OK] All critical environment variables present")
+        print("[OK] All critical environment variables present", flush=True)
 
 def check_db_health():
     """Test the DB connection."""
@@ -54,20 +54,20 @@ def check_db_health():
         if db is not None:
             # For MongoDB, we can try a list_collection_names or similar light operation
             db.list_collection_names()
-            print("[OK] Database connection verified")
+            print("[OK] Database connection verified", flush=True)
             return True
         else:
-            print("[CRITICAL] Database connection failed (get_db returned None)")
+            print("[CRITICAL] Database connection failed (get_db returned None)", flush=True)
             return False
     except Exception as e:
-        print(f"[CRITICAL] Database health check failed: {e}")
+        print(f"[CRITICAL] Database health check failed: {e}", flush=True)
         return False
 
 def create_app(config_name: str = None) -> Flask:
     """
     Create and configure Flask application in a failsafe manner.
     """
-    print("Starting Flask app factory...")
+    print("Starting Flask app factory...", flush=True)
     
     # Run startup checks
     check_environment()
@@ -80,9 +80,9 @@ def create_app(config_name: str = None) -> Flask:
     # Initialize CORS explicitly
     try:
         init_cors(app)
-        print("[OK] CORS initialized")
+        print("[OK] CORS initialized", flush=True)
     except Exception as e:
-        print(f"[CRITICAL] CORS initialization failed: {e}")
+        print(f"[CRITICAL] CORS initialization failed: {e}", flush=True)
 
     # Handle configuration gracefully
     try:
@@ -91,15 +91,15 @@ def create_app(config_name: str = None) -> Flask:
         else:
             app.config.from_object(config['production'])
     except Exception as e:
-        print(f"Config loading failed: {e}")
+        print(f"Config loading failed: {e}", flush=True)
 
     # Register middleware (CORS, Security, etc.) IMMEDIATELY after config
     try:
         from .middleware import register_middleware
         register_middleware(app)
-        print("[OK] Middleware registered")
+        print("[OK] Middleware registered", flush=True)
     except Exception as e:
-        print(f"[CRITICAL] Middleware registration failed: {e}")
+        print(f"[CRITICAL] Middleware registration failed: {e}", flush=True)
 
     # Initialize JWT
     jwt.init_app(app)
@@ -161,26 +161,26 @@ def create_app(config_name: str = None) -> Flask:
         init_extensions(app)
         # Check DB after extensions initialized
         check_db_health()
-        print("[OK] Core extensions initialized")
+        print("[OK] Core extensions initialized", flush=True)
     except Exception as e:
         import traceback
-        print(f"[CRITICAL] Extensions failed: {e}")
+        print(f"[CRITICAL] Extensions failed: {e}", flush=True)
         traceback.print_exc()
 
     try:
         register_blueprints(app)
-        print("[OK] Blueprints registered")
+        print("[OK] Blueprints registered", flush=True)
     except Exception as e:
-        print(f"[ERROR] Blueprint registration failed: {e}")
+        print(f"[ERROR] Blueprint registration failed: {e}", flush=True)
 
     # Print registered routes for debugging
     with app.app_context():
-        print("=== REGISTERED ROUTES ===")
+        print("=== REGISTERED ROUTES ===", flush=True)
         for rule in app.url_map.iter_rules():
-            print(f"{rule.methods} {rule}")
-        print("=========================")
+            print(f"{rule.methods} {rule}", flush=True)
+        print("=========================", flush=True)
 
-    print("Application initialized successfully")
+    print("Application initialized successfully", flush=True)
     return app
 
 
@@ -190,9 +190,9 @@ def register_blueprints(app: Flask) -> None:
     def safe_register(import_func, name):
         try:
             import_func()
-            print(f"[OK] Blueprint registered: {name}")
+            print(f"[OK] Blueprint registered: {name}", flush=True)
         except Exception as e:
-            print(f"[ERROR] Failed to register blueprint '{name}': {e}")
+            print(f"[ERROR] Failed to register blueprint '{name}': {e}", flush=True)
             import traceback
             traceback.print_exc()
 
