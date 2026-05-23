@@ -83,6 +83,11 @@ def init_rate_limiting(app: Flask) -> None:
         # Reconfigure the global limiter instance
         limiter.key_func = get_rate_limit_key
         limiter.storage_uri = ratelimit_storage
+        limiter.storage_options = {
+            "socket_connect_timeout": 2,
+            "socket_timeout": 2,
+            "retry_on_timeout": False
+        }
         limiter._default_limits = [app.config.get('RATELIMIT_DEFAULT', '100/minute')]
         
         # Initialize with app
