@@ -1,3 +1,7 @@
+import sys
+print("=== RUN.PY IS EXECUTING ===", flush=True)
+sys.stdout.flush()
+
 import eventlet
 eventlet.monkey_patch()
 
