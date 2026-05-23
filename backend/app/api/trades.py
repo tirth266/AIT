@@ -7,8 +7,10 @@ Trade management and history endpoints.
 import logging
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 from app.paper_trading.simulator import PaperTradingSimulator
 
 logger = logging.getLogger('trading_app')
@@ -17,23 +19,12 @@ bp = Blueprint('trades', __name__)
 
 
 @bp.route('', methods=['GET'])
+@jwt_required(optional=True)
 def list_trades():
     """
-    List all trades.
-
-    Query Parameters:
-        - mode: paper or live
-        - status: open or closed
-        - symbol: filter by symbol
-        - strategy_id: filter by strategy
-        - limit: number of results
-        - skip: number to skip
-        - start_date: filter start date
-        - end_date: filter end date
-
-    Returns:
-        List of trades
+    List all trades for the user.
     """
+    user_id = get_current_user_id()
     mode = request.args.get('mode')
     status = request.args.get('status')
     symbol = request.args.get('symbol')
@@ -43,7 +34,7 @@ def list_trades():
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
 
-    query = {}
+    query = {'user_id': user_id}
     if mode:
         query['mode'] = mode
     if status:
@@ -89,20 +80,19 @@ def list_trades():
 
 
 @bp.route('/active', methods=['GET'])
+@jwt_required(optional=True)
 def get_active_trades():
     """
-    Get active (open) trades.
-
-    Returns:
-        List of open trades/positions
+    Get active (open) trades for the user.
     """
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
 
     db = get_db()
     if not db:
         return jsonify({'error': 'database_error'}), 500
 
-    positions = list(db.positions.find({'status': 'open', 'mode': mode}))
+    positions = list(db.positions.find({'user_id': user_id, 'status': 'open', 'mode': mode}))
 
     for position in positions:
         position['_id'] = str(position['_id'])

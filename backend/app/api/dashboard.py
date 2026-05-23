@@ -7,8 +7,10 @@ Dashboard data and analytics endpoints.
 import logging
 from datetime import datetime, timedelta
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 
 logger = logging.getLogger('trading_app')
 
@@ -16,12 +18,14 @@ bp = Blueprint('dashboard', __name__)
 
 
 @bp.route('', methods=['GET'])
+@jwt_required(optional=True)
 def get_dashboard():
     """
     Get dashboard data.
     """
     try:
-        logger.info(f"[Dashboard] Request received from {request.remote_addr}")
+        user_id = get_current_user_id()
+        logger.info(f"[Dashboard] Request from {user_id}")
         mode = request.args.get('mode', 'paper')
         logger.info(f"[Dashboard] Mode: {mode}")
 
@@ -112,8 +116,9 @@ def get_dashboard():
 
     except Exception as e:
         import traceback
-        logger.error(f"[Dashboard] Critical failure: {e}")
-        logger.error(traceback.format_exc())
+        logger.error(f"[Dashboard] Critical failure: {e}", exc_info=True)
+        print(f"[ERROR] Dashboard failure: {e}", flush=True)
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': 'internal_error',

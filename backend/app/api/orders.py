@@ -9,8 +9,10 @@ import uuid
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 
 logger = logging.getLogger('trading_app')
 
@@ -18,6 +20,7 @@ bp = Blueprint('orders', __name__)
 
 
 @bp.route('', methods=['GET'])
+@jwt_required(optional=True)
 def list_orders():
     """
     List orders with filtering options.
@@ -34,7 +37,7 @@ def list_orders():
     Returns:
         List of orders
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     status = request.args.get('status')
     order_type = request.args.get('order_type')
     transaction_type = request.args.get('transaction_type')
@@ -102,7 +105,7 @@ def create_order():
     Returns:
         Created order details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     required_fields = ['symbol', 'transaction_type', 'quantity']
@@ -170,7 +173,7 @@ def get_order(order_id):
     Returns:
         Order details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
 
     db = get_db()
     if not db:
@@ -218,7 +221,7 @@ def cancel_order(order_id):
     Returns:
         Cancelled order details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
 
     db = get_db()
     if not db:
@@ -286,7 +289,7 @@ def modify_order(order_id):
     Returns:
         Modified order details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     db = get_db()
@@ -356,7 +359,7 @@ def execute_order(order_id):
     Returns:
         Executed order details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     db = get_db()
@@ -433,7 +436,7 @@ def cancel_all_orders():
     Returns:
         Number of cancelled orders
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     db = get_db()
@@ -479,7 +482,7 @@ def get_order_stats():
     Returns:
         Order statistics
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
     symbol = request.args.get('symbol')
     period = request.args.get('period', 'all')

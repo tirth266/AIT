@@ -38,6 +38,16 @@ def init_extensions(app: Flask) -> None:
     init_redis(app)
     init_redis_service(app)
 
+    # Initialize Trading Engine
+    try:
+        from .trading_engine import init_trading_engine
+        init_trading_engine()
+        print("[DEBUG] Trading engine initialized", flush=True)
+    except Exception as e:
+        print(f"[ERROR] Trading engine initialization failed: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+
     logger.info("All extensions initialized")
 
 

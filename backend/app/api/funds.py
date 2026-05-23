@@ -8,8 +8,10 @@ import logging
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 
 logger = logging.getLogger('trading_app')
 
@@ -17,12 +19,13 @@ bp = Blueprint('funds', __name__)
 
 
 @bp.route('', methods=['GET'])
+@jwt_required(optional=True)
 def get_funds():
     """
     Get user's funds and balance information.
     """
     try:
-        user_id = "default_user"
+        user_id = get_current_user_id()
         logger.info(f"[Funds] Fetching funds for {user_id}")
 
         db = get_db()
@@ -75,6 +78,7 @@ def get_funds():
 
 
 @bp.route('', methods=['POST'])
+@jwt_required(optional=True)
 def add_funds():
     """
     Add funds to trading account.
@@ -91,7 +95,7 @@ def add_funds():
     Returns:
         Updated fund details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     amount = data.get('amount')
@@ -174,7 +178,7 @@ def withdraw_funds():
     Returns:
         Updated fund details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     amount = data.get('amount')
@@ -258,7 +262,7 @@ def list_transactions():
     Returns:
         List of transactions
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     transaction_type = request.args.get('transaction_type')
     mode = request.args.get('mode')
     start_date = request.args.get('start_date')
@@ -311,7 +315,7 @@ def reset_funds():
     Returns:
         Reset fund details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     initial_amount = data.get('amount', 100000)
@@ -372,7 +376,7 @@ def update_pnl():
     Returns:
         Updated fund details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     db = get_db()
@@ -411,7 +415,7 @@ def get_funds_summary():
     Returns:
         Fund summary with statistics
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
 
     db = get_db()
     if not db:

@@ -9,8 +9,10 @@ import uuid
 from datetime import datetime, timezone
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 from app.trading_engine import (
     get_trading_engine,
     get_order_manager,
@@ -30,6 +32,7 @@ bp = Blueprint('trading_engine', __name__)
 
 
 @bp.route('/engine/status', methods=['GET'])
+@jwt_required(optional=True)
 def get_engine_status():
     """Get trading engine status."""
     try:
@@ -46,9 +49,10 @@ def get_engine_status():
 
 
 @bp.route('/order/create', methods=['POST'])
+@jwt_required(optional=True)
 async def create_order():
     """Create and submit a new order."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
     
     data['user_id'] = user_id
@@ -93,9 +97,10 @@ async def create_order():
 
 
 @bp.route('/order/<order_id>', methods=['GET'])
+@jwt_required(optional=True)
 def get_order(order_id):
     """Get order details."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     order_manager = get_order_manager()
     order = order_manager.get_order(order_id)
@@ -107,9 +112,10 @@ def get_order(order_id):
 
 
 @bp.route('/order/<order_id>/cancel', methods=['POST'])
+@jwt_required(optional=True)
 def cancel_order_api(order_id):
     """Cancel an order."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     order_manager = get_order_manager()
     order = order_manager.get_order(order_id)
@@ -130,9 +136,10 @@ def cancel_order_api(order_id):
 
 
 @bp.route('/order/<order_id>/modify', methods=['PUT'])
+@jwt_required(optional=True)
 def modify_order_api(order_id):
     """Modify an order."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
     
     order_manager = get_order_manager()
@@ -153,9 +160,10 @@ def modify_order_api(order_id):
 
 
 @bp.route('/orders', methods=['GET'])
+@jwt_required(optional=True)
 def list_orders():
     """List orders with filters."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     status = request.args.get('status')
     order_type = request.args.get('order_type')
@@ -185,9 +193,10 @@ def list_orders():
 
 
 @bp.route('/positions', methods=['GET'])
+@jwt_required(optional=True)
 def list_positions():
     """List positions with filters."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     status = request.args.get('status')
     symbol = request.args.get('symbol')
@@ -212,10 +221,11 @@ def list_positions():
 
 
 @bp.route('/positions/open', methods=['GET'])
+@jwt_required(optional=True)
 def get_open_positions():
     """Get open positions."""
     try:
-        user_id = "default_user"
+        user_id = get_current_user_id()
         mode = request.args.get('mode', 'paper')
         logger.info(f"[TradingEngine] Fetching open positions for {user_id}, mode={mode}")
         
@@ -245,9 +255,10 @@ def get_open_positions():
 
 
 @bp.route('/positions/<position_id>', methods=['GET'])
+@jwt_required(optional=True)
 def get_position(position_id):
     """Get position details."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     position_manager = get_position_manager()
     position = position_manager.get_position(position_id)
@@ -259,9 +270,10 @@ def get_position(position_id):
 
 
 @bp.route('/positions/<position_id>/exit', methods=['POST'])
+@jwt_required(optional=True)
 def exit_position(position_id):
     """Exit/close a position."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
     
     position_manager = get_position_manager()
@@ -293,9 +305,10 @@ def exit_position(position_id):
 
 
 @bp.route('/pnl', methods=['GET'])
+@jwt_required(optional=True)
 def get_pnl():
     """Get P&L summary."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
     
     pnl_engine = get_pnl_engine()
@@ -305,9 +318,10 @@ def get_pnl():
 
 
 @bp.route('/pnl/day', methods=['GET'])
+@jwt_required(optional=True)
 def get_day_pnl():
     """Get day P&L."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
     
     pnl_engine = get_pnl_engine()
@@ -317,9 +331,10 @@ def get_day_pnl():
 
 
 @bp.route('/margin', methods=['GET'])
+@jwt_required(optional=True)
 def get_margin():
     """Get margin information."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     margin_engine = get_margin_engine()
     margin_info = margin_engine.get_margin_info(user_id)
@@ -328,9 +343,10 @@ def get_margin():
 
 
 @bp.route('/portfolio', methods=['GET'])
+@jwt_required(optional=True)
 def get_portfolio():
     """Get complete portfolio summary."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
     
     margin_engine = get_margin_engine()
@@ -343,9 +359,10 @@ def get_portfolio():
 
 
 @bp.route('/portfolio/holdings', methods=['GET'])
+@jwt_required(optional=True)
 def get_holdings():
     """Get holdings summary."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     mode = request.args.get('mode', 'paper')
     
     portfolio_manager = get_portfolio_manager()
@@ -355,9 +372,10 @@ def get_holdings():
 
 
 @bp.route('/trades', methods=['GET'])
+@jwt_required(optional=True)
 def get_trades():
     """Get trade history."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     symbol = request.args.get('symbol')
     limit = int(request.args.get('limit', 50))
@@ -373,6 +391,7 @@ def get_trades():
 
 
 @bp.route('/market/quotes', methods=['GET'])
+@jwt_required(optional=True)
 def get_market_quotes():
     """Get market quotes."""
     symbols = request.args.get('symbols', '').split(',')
@@ -389,6 +408,7 @@ def get_market_quotes():
 
 
 @bp.route('/market/depth/<symbol>', methods=['GET'])
+@jwt_required(optional=True)
 def get_market_depth(symbol):
     """Get market depth for a symbol."""
     paper_exchange = get_paper_exchange()
@@ -410,9 +430,10 @@ def get_market_depth(symbol):
 
 
 @bp.route('/risk/checks', methods=['GET'])
+@jwt_required(optional=True)
 def get_risk_checks():
     """Get recent risk events."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     limit = int(request.args.get('limit', 50))
     
     risk_engine = get_pre_trade_risk_engine()
@@ -422,9 +443,10 @@ def get_risk_checks():
 
 
 @bp.route('/reconciliation', methods=['GET'])
+@jwt_required(optional=True)
 def run_reconciliation():
     """Run reconciliation for user."""
-    user_id = "default_user"
+    user_id = get_current_user_id()
     
     from app.trading_engine.reconciliation import get_trade_reconciliation
     reconciliation = get_trade_reconciliation()

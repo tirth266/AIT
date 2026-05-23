@@ -248,6 +248,10 @@ def register_blueprints(app: Flask) -> None:
         from .api import market
         app.register_blueprint(market.bp, url_prefix='/api/v1/market')
 
+    def reg_trading_engine():
+        from .api import trading_engine
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading')
+
     def reg_settings():
         from .api import settings
         app.register_blueprint(settings.bp, url_prefix='/api/v1/settings')
@@ -273,6 +277,7 @@ def register_blueprints(app: Flask) -> None:
     safe_register(reg_broker, "broker")
     safe_register(reg_backtest, "backtest")
     safe_register(reg_market, "market")
+    safe_register(reg_trading_engine, "trading_engine")
     safe_register(reg_settings, "settings")
     safe_register(reg_dashboard, "dashboard")
     safe_register(reg_health, "health")

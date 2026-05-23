@@ -8,8 +8,10 @@ import logging
 from datetime import datetime
 from bson import ObjectId
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 
 from app.database.connection import get_db
+from app.utils.auth import get_current_user_id
 
 logger = logging.getLogger('trading_app')
 
@@ -17,12 +19,13 @@ bp = Blueprint('watchlist', __name__)
 
 
 @bp.route('', methods=['GET'])
+@jwt_required(optional=True)
 def get_watchlist():
     """
     List all watchlists for the user.
     """
     try:
-        user_id = "default_user"
+        user_id = get_current_user_id()
         logger.info(f"[Watchlist] Listing watchlists for {user_id}")
 
         db = get_db()
@@ -71,7 +74,7 @@ def create_watchlist():
     Returns:
         Created watchlist details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     name = data.get('name')
@@ -119,14 +122,14 @@ def create_watchlist():
 
 
 @bp.route('/<watchlist_id>', methods=['GET'])
-def get_watchlist(watchlist_id):
+def get_watchlist_by_id(watchlist_id):
     """
     Get a specific watchlist with symbol details.
 
     Returns:
         Watchlist details
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
 
     db = get_db()
     if not db:
@@ -173,7 +176,7 @@ def update_watchlist(watchlist_id):
     Returns:
         Success message
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     db = get_db()
@@ -217,7 +220,7 @@ def delete_watchlist(watchlist_id):
     Returns:
         Success message
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
 
     db = get_db()
     if not db:
@@ -260,7 +263,7 @@ def add_symbol(watchlist_id):
     Returns:
         Updated watchlist
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     symbol = data.get('symbol', '').upper()
@@ -318,7 +321,7 @@ def remove_symbol(watchlist_id, symbol):
     Returns:
         Updated watchlist
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     symbol = symbol.upper()
 
     db = get_db()
@@ -368,7 +371,7 @@ def reorder_watchlists():
     Returns:
         Success message
     """
-    user_id = "default_user"
+    user_id = get_current_user_id()
     data = request.get_json() or {}
 
     watchlist_ids = data.get('watchlist_ids', [])
