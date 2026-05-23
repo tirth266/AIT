@@ -279,6 +279,7 @@ def register_blueprints(app: Flask) -> None:
     def reg_trading_engine():
         from .api import trading_engine
         app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/positions')
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading')
 
     def reg_settings():
         from .api import settings

@@ -47,6 +47,10 @@ class Config:
 
     SECRET_KEY = os.getenv("SECRET_KEY")
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+    JWT_TOKEN_LOCATION = ['headers']
+    JWT_HEADER_NAME = 'Authorization'
+    JWT_HEADER_TYPE = 'Bearer'
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)
 
     ANGEL_API_KEY = os.getenv("ANGEL_API_KEY")
     ANGEL_CLIENT_ID = os.getenv("ANGEL_CLIENT_ID")
