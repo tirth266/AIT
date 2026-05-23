@@ -55,20 +55,28 @@ def init_rate_limiting(app: Flask) -> None:
     ratelimit_storage = app.config.get('RATELIMIT_STORAGE_URL', 'memory://')
 
     # Test Redis connectivity if configured
-    if 'redis' in ratelimit_storage:
+    if ratelimit_storage and 'redis' in ratelimit_storage:
         try:
             import redis
             from redis import ConnectionError, TimeoutError
             
-            # Extract basic host/port if possible or just try to ping
-            client = redis.from_url(ratelimit_storage, socket_connect_timeout=1)
+            # Use short timeouts to prevent blocking startup
+            client = redis.from_url(
+                ratelimit_storage, 
+                socket_connect_timeout=2,
+                socket_timeout=2,
+                retry_on_timeout=False
+            )
             client.ping()
+            print(f"[OK] Redis connected for rate limiting", flush=True)
             logger.info(f"Using Redis for rate limiting: {ratelimit_storage}")
-        except (ConnectionError, TimeoutError, ImportError) as e:
+        except (ConnectionError, TimeoutError, ImportError, Exception) as e:
+            print(f"[WARN] Redis connection failed for rate limiting: {e}", flush=True)
             logger.error(f"Redis connection failed for rate limiting: {e}")
             logger.warning("Falling back to in-memory rate limiting")
             ratelimit_storage = 'memory://'
     else:
+        print("[INFO] Using in-memory rate limiting", flush=True)
         logger.warning("Using in-memory rate limiting - NOT RECOMMENDED FOR PRODUCTION")
 
     try:
@@ -80,12 +88,16 @@ def init_rate_limiting(app: Flask) -> None:
         # Initialize with app
         limiter.init_app(app)
     except Exception as e:
+        print(f"[ERROR] Failed to initialize Flask-Limiter: {e}", flush=True)
         logger.error(f"Failed to initialize Flask-Limiter with {ratelimit_storage}: {e}")
         # Final desperate fallback
         if ratelimit_storage != 'memory://':
             logger.warning("Attempting emergency fallback to memory://")
-            limiter.storage_uri = 'memory://'
-            limiter.init_app(app)
+            try:
+                limiter.storage_uri = 'memory://'
+                limiter.init_app(app)
+            except Exception:
+                pass
 
     # Custom rate limit error handler
     @app.errorhandler(429)

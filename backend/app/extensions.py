@@ -120,7 +120,14 @@ def init_redis(app: Flask) -> None:
 
     try:
         redis_url = app.config.get('REDIS_URL')
-        redis_client = redis.from_url(redis_url, decode_responses=True)
+        # Use short timeouts to prevent startup blocking
+        redis_client = redis.from_url(
+            redis_url, 
+            decode_responses=True,
+            socket_connect_timeout=2,
+            socket_timeout=2,
+            retry_on_timeout=False
+        )
         redis_client.ping()
         app.redis = redis_client
         print(f"[OK] Redis connected: {redis_url}", flush=True)
