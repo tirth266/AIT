@@ -8,9 +8,9 @@ from app.database.connection import get_db
 
 logger = logging.getLogger('trading_app')
 
-bp = Blueprint("health", __name__)
+health_bp = Blueprint("health", __name__)
 
-@bp.route("/ping")
+@health_bp.route("/ping")
 def ping():
     """Simple ping for keep-alive."""
     return jsonify({
@@ -18,16 +18,21 @@ def ping():
         "timestamp": datetime.utcnow().isoformat()
     })
 
-@bp.route("/status")
+@health_bp.route("/status")
 def health_check():
     """Comprehensive health check."""
-    from app.__init__ import START_TIME
+    try:
+        # Avoid circular import by importing here
+        from app import START_TIME
+    except ImportError:
+        START_TIME = datetime.utcnow()
     
     db_status = "error"
     db_msg = "unknown"
     try:
         db = get_db()
         if db is not None:
+            # list_collection_names is a safe way to test connection
             db.list_collection_names()
             db_status = "ok"
             db_msg = "connected"
@@ -36,7 +41,7 @@ def health_check():
     except Exception as e:
         db_msg = str(e)
         logger.error(f"Health check DB failure: {e}")
-        logger.error(traceback.format_exc())
+        # logger.error(traceback.format_exc())
 
     # Environment check
     required_vars = [

@@ -115,10 +115,7 @@ def create_app(config_name: str = None) -> Flask:
     @app.route("/api/v1/ping")
     def ping():
         """Instant ping route for Render keep-alive."""
-        return jsonify({
-            "status": "ok",
-            "timestamp": __import__('datetime').datetime.utcnow().isoformat()
-        })
+        return jsonify({"status": "ok"}), 200
 
     @app.route('/favicon.ico')
     def favicon():
@@ -174,6 +171,13 @@ def create_app(config_name: str = None) -> Flask:
     except Exception as e:
         print(f"[ERROR] Blueprint registration failed: {e}")
 
+    # Print registered routes for debugging
+    with app.app_context():
+        print("=== REGISTERED ROUTES ===")
+        for rule in app.url_map.iter_rules():
+            print(f"{rule.methods} {rule}")
+        print("=========================")
+
     print("Application initialized successfully")
     return app
 
@@ -205,6 +209,6 @@ def register_blueprints(app: Flask) -> None:
         app.register_blueprint(market.bp, url_prefix='/api/v1/market')
         app.register_blueprint(settings.bp, url_prefix='/api/v1/settings')
         app.register_blueprint(dashboard.bp, url_prefix='/api/v1/dashboard')
-        app.register_blueprint(health.bp, url_prefix='/api/v1/health')
+        app.register_blueprint(health.health_bp, url_prefix='/api/v1/health')
     except Exception as e:
         print(f"Blueprint registration partial failure: {e}")
