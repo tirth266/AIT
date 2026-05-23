@@ -7,6 +7,7 @@ Endpoints for interacting with Angel One.
 import logging
 import asyncio
 from flask import Blueprint, jsonify, request, Response
+from flask_jwt_extended import create_access_token
 from ..auth.session import session_manager
 from ..api.client import get_client
 
@@ -173,14 +174,18 @@ def login():
 
             logger.info(f"Login successful for client: {clientcode}")
 
+            # Generate platform token for our API protection
+            platform_token = create_access_token(identity=clientcode)
+
             return jsonify({
                 'success': True,
                 'message': 'Logged in successfully',
                 'data': {
                     'client_code': clientcode,
-                    'jwt_token': jwt_token,
+                    'jwt_token': jwt_token,  # Broker token
                     'refresh_token': refresh_token,
-                    'feed_token': feed_token
+                    'feed_token': feed_token,
+                    'access_token': platform_token  # Platform token (Frontend should use this)
                 }
             }), 200
 

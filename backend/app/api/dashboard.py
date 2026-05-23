@@ -291,3 +291,16 @@ def get_positions():
         position['_id'] = str(position['_id'])
 
     return jsonify({'positions': positions}), 200
+
+
+@bp.route('/test-noauth')
+def test_noauth():
+    return jsonify({"success": True, "message": "no auth needed"})
+
+
+@bp.route('/test-auth')
+@jwt_required()
+def test_auth():
+    from flask_jwt_extended import get_jwt_identity
+    user = get_jwt_identity()
+    return jsonify({"success": True, "user": user})

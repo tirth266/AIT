@@ -8,7 +8,7 @@ import logging
 import os
 import datetime
 from flask import Blueprint, jsonify, request
-import jwt
+from flask_jwt_extended import create_access_token, decode_token
 
 logger = logging.getLogger('auth_api')
 
@@ -16,17 +16,8 @@ bp = Blueprint('auth', __name__)
 
 
 def generate_token(user_id: str = 'default_user') -> str:
-    """Generate a JWT token for the user."""
-    jwt_secret = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key')
-    jwt_algorithm = 'HS256'
-
-    payload = {
-        'user_id': user_id,
-        'exp': datetime.datetime.utcnow() + datetime.timedelta(hours=24),
-        'iat': datetime.datetime.utcnow(),
-    }
-
-    return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
+    """Generate a JWT token for the user using flask_jwt_extended."""
+    return create_access_token(identity=user_id, expires_delta=datetime.timedelta(hours=24))
 
 
 @bp.route('/token', methods=['GET'])
@@ -55,7 +46,7 @@ def get_token():
 
 @bp.route('/verify', methods=['POST'])
 def verify_token():
-    """Verify a JWT token."""
+    """Verify a JWT token using flask_jwt_extended."""
     data = request.get_json() or {}
     token = data.get('token')
 
@@ -66,20 +57,13 @@ def verify_token():
         }), 400
 
     try:
-        jwt_secret = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key')
-        payload = jwt.decode(token, jwt_secret, algorithms=['HS256'])
-
+        decoded = decode_token(token)
         return jsonify({
             'valid': True,
-            'user_id': payload.get('user_id')
+            'user_id': decoded.get('sub')
         }), 200
 
-    except jwt.ExpiredSignatureError:
-        return jsonify({
-            'valid': False,
-            'message': 'Token expired'
-        }), 401
-    except jwt.InvalidTokenError as e:
+    except Exception as e:
         return jsonify({
             'valid': False,
             'message': f'Invalid token: {str(e)}'
@@ -99,9 +83,8 @@ def refresh_token():
         }), 400
 
     try:
-        jwt_secret = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key')
-        payload = jwt.decode(old_token, jwt_secret, algorithms=['HS256'])
-        user_id = payload.get('user_id')
+        decoded = decode_token(old_token)
+        user_id = decoded.get('sub')
 
         new_token = generate_token(user_id)
 
@@ -113,12 +96,7 @@ def refresh_token():
             'expires_in': 86400
         }), 200
 
-    except jwt.ExpiredSignatureError:
-        return jsonify({
-            'error': 'auth_error',
-            'message': 'Token expired, please login again'
-        }), 401
-    except jwt.InvalidTokenError as e:
+    except Exception as e:
         return jsonify({
             'error': 'auth_error',
             'message': f'Invalid token: {str(e)}'

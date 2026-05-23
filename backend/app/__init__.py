@@ -156,6 +156,34 @@ def create_app(config_name: str = None) -> Flask:
     # SocketIO will be initialized with the app
     socketio.init_app(app)
 
+    # JWT Error Handlers
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        print(f"[JWT] Invalid token: {error}", flush=True)
+        return jsonify({
+            "success": False, 
+            "error": "invalid_token",
+            "message": f"Invalid token: {error}"
+        }), 422
+
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_data):
+        print(f"[JWT] Token expired: {jwt_data}", flush=True)
+        return jsonify({
+            "success": False, 
+            "error": "token_expired",
+            "message": "Token has expired"
+        }), 401
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        print(f"[JWT] Missing token: {error}", flush=True)
+        return jsonify({
+            "success": False, 
+            "error": "unauthorized",
+            "message": f"Missing authorization header: {error}"
+        }), 401
+
     # Robust initialization of extensions and middleware
     try:
         init_extensions(app)
