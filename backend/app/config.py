@@ -15,7 +15,11 @@ def build_mongo_uri() -> str:
     """
     Safely build MongoDB URI from environment variables.
     Handles RFC 3986 escaping for credentials.
+    Prioritizes existing MONGO_URI if present.
     """
+    if os.environ.get("MONGO_URI"):
+        return os.environ.get("MONGO_URI")
+
     user = os.environ.get("MONGO_USER", "")
     password = quote_plus(os.environ.get("MONGO_PASSWORD", ""))
     host = os.environ.get("MONGO_HOST", "localhost")

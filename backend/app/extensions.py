@@ -52,7 +52,26 @@ def init_mongodb(app: Flask) -> None:
     print("-"*50)
 
     try:
-        mongo_uri = app.config.get('MONGO_URI')
+        mongo_uri = app.config.get('MONGO_URI') or os.environ.get("MONGO_URI")
+        if not mongo_uri:
+            print("[ERROR] MONGO_URI is not set in app.config or environment!")
+            logger.error("[MONGO] MONGO_URI is not set!")
+            return None
+
+        logger.info(f"[MONGO] Connecting to MongoDB...")
+        
+        # Hide password in logs
+        log_uri = mongo_uri
+        if "@" in mongo_uri:
+            prefix = mongo_uri.split("@")[0]
+            suffix = mongo_uri.split("@")[1]
+            if ":" in prefix:
+                protocol = prefix.split("://")[0]
+                user = prefix.split("://")[1].split(":")[0]
+                log_uri = f"{protocol}://{user}:****@{suffix}"
+        
+        print(f"[INFO] Connecting to: {log_uri}")
+
         mongo_client = MongoClient(
             mongo_uri,
             serverSelectionTimeoutMS=5000,
@@ -62,8 +81,11 @@ def init_mongodb(app: Flask) -> None:
             retryWrites=True,
             w='majority'
         )
+        
+        # Force connection test
         mongo_client.admin.command('ping')
-        print(f"[OK] MongoDB connected: {mongo_uri.split('@')[-1] if '@' in mongo_uri else mongo_uri}")
+        print("[OK] MongoDB connected successfully!")
+        logger.info("[MONGO] MongoDB connected successfully!")
 
         db_name = app.config.get('MONGO_DB_NAME', 'trading_db')
         mongo_db = mongo_client[db_name]
@@ -74,11 +96,11 @@ def init_mongodb(app: Flask) -> None:
         connection._mongo_client = mongo_client
         connection._mongo_db = mongo_db
 
-        logger.info(f"MongoDB connected: {db_name}")
+        logger.info(f"MongoDB database initialized: {db_name}")
     except Exception as e:
-        print(f"[WARN] MongoDB connection failed: {e}")
+        print(f"[ERROR] MongoDB connection failed: {e}")
+        logger.error(f"[MONGO] Connection failed: {e}")
         print("[WARN] Application will run with limited functionality")
-        logger.warning(f"MongoDB connection failed: {e}")
         mongo_client = None
         mongo_db = None
     
