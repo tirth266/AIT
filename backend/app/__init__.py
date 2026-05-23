@@ -163,7 +163,9 @@ def create_app(config_name: str = None) -> Flask:
         check_db_health()
         print("[OK] Core extensions initialized")
     except Exception as e:
-        print(f"[WARN] Some extensions failed to initialize: {e}")
+        import traceback
+        print(f"[CRITICAL] Extensions failed: {e}")
+        traceback.print_exc()
 
     try:
         register_blueprints(app)

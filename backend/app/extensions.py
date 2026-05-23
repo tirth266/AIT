@@ -31,7 +31,10 @@ def init_extensions(app: Flask) -> None:
     """Initialize all Flask extensions."""
     global mongo_client, mongo_db, redis_client, redis_service
 
+    print("[DEBUG] init_extensions() called")
     init_mongodb(app)
+    print("[DEBUG] init_mongodb() completed")
+    
     init_redis(app)
     init_redis_service(app)
 
@@ -46,6 +49,7 @@ def init_limiter(app: Flask) -> None:
 
 def init_mongodb(app: Flask) -> None:
     """Initialize MongoDB connection with validation."""
+    print("[MONGO] init_mongodb() entered")  # Must appear in logs
     global mongo_client, mongo_db
     print("\n" + "-"*50)
     print("  MongoDB Connection")
