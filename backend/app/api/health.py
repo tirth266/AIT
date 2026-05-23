@@ -1,67 +1,49 @@
 import os
+import time
 import logging
-import traceback
-from datetime import datetime
 from flask import Blueprint, jsonify
-
-from app.database.connection import get_db
+from datetime import datetime
 
 logger = logging.getLogger('trading_app')
 
 health_bp = Blueprint("health", __name__)
+START_TIME = time.time()
+
+@health_bp.route("/status")
+def status():
+    """Safe health check endpoint that never crashes."""
+    # 1. Check required environment variables
+    required_vars = ["MONGO_URI", "JWT_SECRET_KEY", "SECRET_KEY", "ANGEL_API_KEY"]
+    env_status = {var: "present" if os.environ.get(var) else "MISSING" for var in required_vars}
+
+    # 2. Check Database Connection safely
+    db_status = "unknown"
+    try:
+        from app.extensions import get_mongo_db
+        db = get_mongo_db()
+        if db is not None:
+            # Simple ping to verify connection
+            db.command("ping")
+            db_status = "connected"
+        else:
+            db_status = "error: db_is_none"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+        logger.error(f"Health status DB check failed: {e}")
+
+    # 3. Calculate Uptime
+    uptime = time.time() - START_TIME
+
+    return jsonify({
+        "status": "ok",
+        "uptime_seconds": round(uptime, 2),
+        "database": db_status,
+        "environment": env_status,
+        "flask_env": os.environ.get("FLASK_ENV", "not set"),
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
 
 @health_bp.route("/ping")
 def ping():
-    """Simple ping for keep-alive."""
-    return jsonify({
-        "status": "ok",
-        "timestamp": datetime.utcnow().isoformat()
-    })
-
-@health_bp.route("/status")
-def health_check():
-    """Comprehensive health check."""
-    try:
-        # Avoid circular import by importing here
-        from app import START_TIME
-    except ImportError:
-        START_TIME = datetime.utcnow()
-    
-    db_status = "error"
-    db_msg = "unknown"
-    try:
-        db = get_db()
-        if db is not None:
-            # list_collection_names is a safe way to test connection
-            db.list_collection_names()
-            db_status = "ok"
-            db_msg = "connected"
-        else:
-            db_msg = "connection_returned_none"
-    except Exception as e:
-        db_msg = str(e)
-        logger.error(f"Health check DB failure: {e}")
-        # logger.error(traceback.format_exc())
-
-    # Environment check
-    required_vars = [
-        "MONGO_URI", "JWT_SECRET_KEY", "SECRET_KEY",
-        "ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_TOTP_SECRET"
-    ]
-    env_status = {}
-    for var in required_vars:
-        env_status[var] = "present" if os.environ.get(var) else "missing"
-
-    uptime = datetime.utcnow() - START_TIME
-
-    return jsonify({
-        "status": "ok" if db_status == "ok" else "degraded",
-        "database": {
-            "status": db_status,
-            "message": db_msg
-        },
-        "environment": env_status,
-        "flask_env": os.environ.get('FLASK_ENV', 'unknown'),
-        "uptime_seconds": int(uptime.total_seconds()),
-        "timestamp": datetime.utcnow().isoformat()
-    })
+    """Ultra-lightweight ping for keep-alive."""
+    return jsonify({"status": "ok"}), 200
