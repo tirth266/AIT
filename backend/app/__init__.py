@@ -183,32 +183,94 @@ def create_app(config_name: str = None) -> Flask:
 
 
 def register_blueprints(app: Flask) -> None:
-    """Register all API blueprints with safety checks."""
-    try:
-        # Wrap each registration in its own try/except if needed
+    """Register all API blueprints with individual safety checks."""
+
+    def safe_register(import_func, name):
+        try:
+            import_func()
+            print(f"[OK] Blueprint registered: {name}")
+        except Exception as e:
+            print(f"[ERROR] Failed to register blueprint '{name}': {e}")
+            import traceback
+            traceback.print_exc()
+
+    def reg_angelone():
         from .brokers.angelone import angelone_bp
         app.register_blueprint(angelone_bp, url_prefix='/api/v1/broker/angelone')
 
-        from .api import (
-            strategies, trades, orders, watchlist,
-            ai_signals, notifications, funds, bot, broker,
-            backtest, market, settings, dashboard, health, auth
-        )
-        # Core Blueprints
+    def reg_auth():
+        from .api import auth
         app.register_blueprint(auth.bp, url_prefix='/api/v1/auth')
+
+    def reg_strategies():
+        from .api import strategies
         app.register_blueprint(strategies.bp, url_prefix='/api/v1/strategies')
+
+    def reg_trades():
+        from .api import trades
         app.register_blueprint(trades.bp, url_prefix='/api/v1/trades')
+
+    def reg_orders():
+        from .api import orders
         app.register_blueprint(orders.bp, url_prefix='/api/v1/orders')
+
+    def reg_watchlist():
+        from .api import watchlist
         app.register_blueprint(watchlist.bp, url_prefix='/api/v1/watchlist')
+
+    def reg_signals():
+        from .api import ai_signals
         app.register_blueprint(ai_signals.bp, url_prefix='/api/v1/signals')
+
+    def reg_notifications():
+        from .api import notifications
         app.register_blueprint(notifications.bp, url_prefix='/api/v1/notifications')
+
+    def reg_funds():
+        from .api import funds
         app.register_blueprint(funds.bp, url_prefix='/api/v1/funds')
+
+    def reg_bot():
+        from .api import bot
         app.register_blueprint(bot.bp, url_prefix='/api/v1/bot')
+
+    def reg_broker():
+        from .api import broker
         app.register_blueprint(broker.bp, url_prefix='/api/v1/broker')
+
+    def reg_backtest():
+        from .api import backtest
         app.register_blueprint(backtest.bp, url_prefix='/api/v1/backtest')
+
+    def reg_market():
+        from .api import market
         app.register_blueprint(market.bp, url_prefix='/api/v1/market')
+
+    def reg_settings():
+        from .api import settings
         app.register_blueprint(settings.bp, url_prefix='/api/v1/settings')
+
+    def reg_dashboard():
+        from .api import dashboard
         app.register_blueprint(dashboard.bp, url_prefix='/api/v1/dashboard')
+
+    def reg_health():
+        from .api import health
         app.register_blueprint(health.health_bp, url_prefix='/api/v1/health')
-    except Exception as e:
-        print(f"Blueprint registration partial failure: {e}")
+
+    safe_register(reg_angelone, "angelone")
+    safe_register(reg_auth, "auth")
+    safe_register(reg_strategies, "strategies")
+    safe_register(reg_trades, "trades")
+    safe_register(reg_orders, "orders")
+    safe_register(reg_watchlist, "watchlist")
+    safe_register(reg_signals, "ai_signals")
+    safe_register(reg_notifications, "notifications")
+    safe_register(reg_funds, "funds")
+    safe_register(reg_bot, "bot")
+    safe_register(reg_broker, "broker")
+    safe_register(reg_backtest, "backtest")
+    safe_register(reg_market, "market")
+    safe_register(reg_settings, "settings")
+    safe_register(reg_dashboard, "dashboard")
+    safe_register(reg_health, "health")

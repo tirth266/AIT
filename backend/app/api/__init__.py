@@ -1,29 +1,3 @@
-"""
-API Module
-==========
-API blueprints and route handlers.
-"""
-
-from . import (
-    auth, strategies, trades, orders, watchlist,
-    ai_signals, notifications, funds, bot, broker,
-    backtest, market, settings, dashboard, health
-)
-
-__all__ = [
-    'auth',
-    'strategies',
-    'trades',
-    'orders',
-    'watchlist',
-    'ai_signals',
-    'notifications',
-    'funds',
-    'bot',
-    'broker',
-    'backtest',
-    'market',
-    'settings',
-    'dashboard',
-    'health'
-]
+"""API Module"""
+# All imports are now handled lazily inside register_blueprints() to prevent 
+# a single failing module from blocking the entire application.
