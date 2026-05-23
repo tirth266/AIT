@@ -17,7 +17,11 @@ from .middleware.cors import init_cors
 # Global JWT instance
 jwt = JWTManager()
 
+# Start time for uptime calculation
+START_TIME = __import__('datetime').datetime.utcnow()
+
 # Initialize SocketIO globally with production CORS settings
+# Increased ping_timeout and ping_interval to prevent WebSocket heartbeats timeouts
 socketio = SocketIO(
     cors_allowed_origins=[
         "https://ait-flame.vercel.app",
@@ -26,15 +30,47 @@ socketio = SocketIO(
     async_mode="eventlet",
     logger=True,
     engineio_logger=True,
-    ping_timeout=60,
-    ping_interval=25
+    ping_timeout=120,
+    ping_interval=45
 )
+
+def check_environment():
+    """Verify all required environment variables exist."""
+    required_vars = [
+        "MONGO_URI", "JWT_SECRET_KEY", "SECRET_KEY",
+        "ANGEL_API_KEY", "ANGEL_CLIENT_ID", "ANGEL_TOTP_SECRET"
+    ]
+    missing = [var for var in required_vars if not os.environ.get(var)]
+    if missing:
+        print(f"[CRITICAL] Missing environment variables: {', '.join(missing)}")
+    else:
+        print("[OK] All critical environment variables present")
+
+def check_db_health():
+    """Test the DB connection."""
+    from .database.connection import get_db
+    try:
+        db = get_db()
+        if db is not None:
+            # For MongoDB, we can try a list_collection_names or similar light operation
+            db.list_collection_names()
+            print("[OK] Database connection verified")
+            return True
+        else:
+            print("[CRITICAL] Database connection failed (get_db returned None)")
+            return False
+    except Exception as e:
+        print(f"[CRITICAL] Database health check failed: {e}")
+        return False
 
 def create_app(config_name: str = None) -> Flask:
     """
     Create and configure Flask application in a failsafe manner.
     """
     print("Starting Flask app factory...")
+    
+    # Run startup checks
+    check_environment()
     
     if config_name is None:
         config_name = os.environ.get('FLASK_ENV', 'production')
@@ -58,15 +94,12 @@ def create_app(config_name: str = None) -> Flask:
         print(f"Config loading failed: {e}")
 
     # Register middleware (CORS, Security, etc.) IMMEDIATELY after config
-    # This ensures CORS headers are handled even if subsequent steps fail
     try:
         from .middleware import register_middleware
         register_middleware(app)
         print("[OK] Middleware registered")
     except Exception as e:
         print(f"[CRITICAL] Middleware registration failed: {e}")
-        import traceback
-        traceback.print_exc()
 
     # Initialize JWT
     jwt.init_app(app)
@@ -81,8 +114,10 @@ def create_app(config_name: str = None) -> Flask:
 
     @app.route("/api/v1/ping")
     def ping():
+        """Instant ping route for Render keep-alive."""
         return jsonify({
-            "status": "pong"
+            "status": "ok",
+            "timestamp": __import__('datetime').datetime.utcnow().isoformat()
         })
 
     @app.route('/favicon.ico')
@@ -100,39 +135,44 @@ def create_app(config_name: str = None) -> Flask:
             "frontend_origin": os.environ.get("FRONTEND_ORIGIN", "not set")
         })
 
-    # Robust global exception handler
+    # Global exception handler
     @app.errorhandler(Exception)
     def handle_exception(e):
         import traceback
-        print("==== BACKEND ERROR ====")
-        print(str(e))
-        traceback.print_exc()
-        return jsonify({
+        import logging
+        logger = logging.getLogger('trading_app')
+        logger.error("==== GLOBAL EXCEPTION CAUGHT ====")
+        logger.error(str(e))
+        logger.error(traceback.format_exc())
+        
+        # Include traceback in response if in development mode
+        error_response = {
             "success": False,
             "error": str(e),
             "type": type(e).__name__
-        }), 500
+        }
+        if app.debug or os.environ.get('FLASK_ENV') == 'development':
+            error_response["traceback"] = traceback.format_exc()
+            
+        return jsonify(error_response), 500
 
     # SocketIO will be initialized with the app
     socketio.init_app(app)
 
     # Robust initialization of extensions and middleware
     try:
-        # 1. Initialize database and core extensions
         init_extensions(app)
+        # Check DB after extensions initialized
+        check_db_health()
         print("[OK] Core extensions initialized")
     except Exception as e:
         print(f"[WARN] Some extensions failed to initialize: {e}")
-        import traceback
-        traceback.print_exc()
 
     try:
         register_blueprints(app)
         print("[OK] Blueprints registered")
     except Exception as e:
         print(f"[ERROR] Blueprint registration failed: {e}")
-        import traceback
-        traceback.print_exc()
 
     print("Application initialized successfully")
     return app
