@@ -218,7 +218,7 @@ def register_blueprints(app: Flask) -> None:
 
     def reg_watchlist():
         from .api import watchlist
-        app.register_blueprint(watchlist.bp, url_prefix='/api/v1/watchlist')
+        app.register_blueprint(watchlist.bp, url_prefix='/api/v1/watchlists')
 
     def reg_signals():
         from .api import ai_signals
@@ -250,7 +250,7 @@ def register_blueprints(app: Flask) -> None:
 
     def reg_trading_engine():
         from .api import trading_engine
-        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading')
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/positions')
 
     def reg_settings():
         from .api import settings
