@@ -220,7 +220,7 @@ def list_positions():
     }), 200
 
 
-@bp.route('/positions/open', methods=['GET'])
+@bp.route('/open', methods=['GET'])
 @jwt_required(optional=True)
 def get_open_positions():
     """Get open positions."""
