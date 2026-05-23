@@ -29,7 +29,7 @@ def get_funds():
         logger.info(f"[Funds] Fetching funds for {user_id}")
 
         db = get_db()
-        if not db:
+        if db is None:
             logger.error("[Funds] Database connection missing")
             return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
@@ -106,7 +106,7 @@ def add_funds():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     funds = db.funds.find_one({'user_id': user_id})
@@ -189,7 +189,7 @@ def withdraw_funds():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     funds = db.funds.find_one({'user_id': user_id})
@@ -283,7 +283,7 @@ def list_transactions():
             query['created_at']['$lte'] = datetime.fromisoformat(end_date)
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     transactions = list(db.fund_transactions.find(query).sort('created_at', -1).skip(skip).limit(limit))
@@ -321,7 +321,7 @@ def reset_funds():
     initial_amount = data.get('amount', 100000)
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     funds = db.funds.find_one({'user_id': user_id})
@@ -380,7 +380,7 @@ def update_pnl():
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     update_data = {'updated_at': datetime.utcnow()}
@@ -418,7 +418,7 @@ def get_funds_summary():
     user_id = get_current_user_id()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     funds = db.funds.find_one({'user_id': user_id})

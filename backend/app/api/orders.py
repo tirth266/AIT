@@ -59,7 +59,7 @@ def list_orders():
         query['mode'] = mode
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     orders = list(db.orders.find(query).sort('created_at', -1).skip(skip).limit(limit))
@@ -117,7 +117,7 @@ def create_order():
             }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     order_id = f"ORD{uuid.uuid4().hex[:12].upper()}"
@@ -176,7 +176,7 @@ def get_order(order_id):
     user_id = get_current_user_id()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     order = db.orders.find_one({
@@ -224,7 +224,7 @@ def cancel_order(order_id):
     user_id = get_current_user_id()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     order = db.orders.find_one({
@@ -293,7 +293,7 @@ def modify_order(order_id):
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     order = db.orders.find_one({
@@ -363,7 +363,7 @@ def execute_order(order_id):
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     order = db.orders.find_one({
@@ -440,7 +440,7 @@ def cancel_all_orders():
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     query = {
@@ -488,7 +488,7 @@ def get_order_stats():
     period = request.args.get('period', 'all')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     query = {'user_id': user_id, 'mode': mode}

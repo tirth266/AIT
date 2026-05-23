@@ -102,7 +102,7 @@ class CeleryTask:
 
         from app.database.connection import get_db
         db = get_db()
-        if db:
+        if db is not None:
             db.logs.insert_one({
                 'level': 'ERROR',
                 'category': 'CELERY',

@@ -29,7 +29,7 @@ class PositionManager:
     ) -> Optional[str]:
         """Open a new position."""
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         try:
@@ -67,7 +67,7 @@ class PositionManager:
     ) -> Optional[Dict]:
         """Close an existing position."""
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         try:
@@ -114,7 +114,7 @@ class PositionManager:
     async def get_open_positions(self, user_id: str) -> List[Dict]:
         """Get all open positions for a user."""
         db = get_db()
-        if not db:
+        if db is None:
             return []
 
         try:
@@ -135,7 +135,7 @@ class PositionManager:
     async def get_position(self, position_id: str) -> Optional[Dict]:
         """Get a specific position."""
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         try:
@@ -155,7 +155,7 @@ class PositionManager:
     ) -> None:
         """Update position with current market price."""
         db = get_db()
-        if not db:
+        if db is None:
             return
 
         try:
@@ -225,7 +225,7 @@ class PositionManager:
     async def get_portfolio_summary(self, user_id: str) -> Dict:
         """Get portfolio summary with total P&L."""
         db = get_db()
-        if not db:
+        if db is None:
             return {}
 
         try:
@@ -266,7 +266,7 @@ class PositionManager:
     ) -> List[Dict]:
         """Get closed positions history."""
         db = get_db()
-        if not db:
+        if db is None:
             return []
 
         try:

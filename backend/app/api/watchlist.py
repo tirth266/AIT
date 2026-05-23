@@ -29,7 +29,7 @@ def get_watchlist():
         logger.info(f"[Watchlist] Listing watchlists for {user_id}")
 
         db = get_db()
-        if not db:
+        if db is None:
             logger.error("[Watchlist] Database connection missing")
             return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
@@ -85,7 +85,7 @@ def create_watchlist():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     existing = db.watchlists.find_one({'user_id': user_id, 'name': name})
@@ -132,7 +132,7 @@ def get_watchlist_by_id(watchlist_id):
     user_id = get_current_user_id()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -180,7 +180,7 @@ def update_watchlist(watchlist_id):
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -223,7 +223,7 @@ def delete_watchlist(watchlist_id):
     user_id = get_current_user_id()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -274,7 +274,7 @@ def add_symbol(watchlist_id):
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -325,7 +325,7 @@ def remove_symbol(watchlist_id, symbol):
     symbol = symbol.upper()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -378,7 +378,7 @@ def reorder_watchlists():
     default_id = data.get('default_id')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     for idx, wl_id in enumerate(watchlist_ids):

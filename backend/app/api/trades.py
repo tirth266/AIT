@@ -56,7 +56,7 @@ def list_trades():
             query['entry_time']['$lte'] = datetime.fromisoformat(end_date)
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     trades = list(db.trades.find(query).sort('created_at', -1).skip(skip).limit(limit))
@@ -89,7 +89,7 @@ def get_active_trades():
     mode = request.args.get('mode', 'paper')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     positions = list(db.positions.find({'user_id': user_id, 'status': 'open', 'mode': mode}))
@@ -153,7 +153,7 @@ def execute_trade():
         )
 
         db = get_db()
-        if db:
+        if db is not None:
             trade = {
                 'strategy_id': ObjectId(data['strategy_id']) if data.get('strategy_id') else None,
                 'symbol': symbol,
@@ -194,7 +194,7 @@ def get_trade(trade_id):
         Trade details
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -226,7 +226,7 @@ def close_trade(trade_id):
     reason = data.get('reason', 'manual')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -314,7 +314,7 @@ def get_trade_stats():
         query['entry_time'] = {'$gte': start_date}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     trades = list(db.trades.find(query))

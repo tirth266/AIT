@@ -216,7 +216,7 @@ class BacktestEngine:
     ) -> List[Dict]:
         """Get historical candle data."""
         db = get_db()
-        if not db:
+        if db is None:
             return self._generate_sample_data(symbol, start_date, end_date)
 
         try:

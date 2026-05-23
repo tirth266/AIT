@@ -68,7 +68,7 @@ class PaperTradingEngine:
             Portfolio dict
         """
         db = get_db()
-        if not db:
+        if db is None:
             return {}
 
         capital = initial_capital or self._default_capital
@@ -95,7 +95,7 @@ class PaperTradingEngine:
     async def get_portfolio(self, user_id: str) -> Optional[Dict]:
         """Get paper trading portfolio."""
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         return db.paper_portfolios.find_one({'user_id': user_id})
@@ -128,7 +128,7 @@ class PaperTradingEngine:
             Trade dict
         """
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         portfolio = await self.get_portfolio(user_id)
@@ -207,7 +207,7 @@ class PaperTradingEngine:
             Trade dict with P&L
         """
         db = get_db()
-        if not db:
+        if db is None:
             return None
 
         trade = db.paper_trades.find_one({'_id': trade_id})
@@ -266,7 +266,7 @@ class PaperTradingEngine:
     async def get_open_trades(self, user_id: str) -> List[Dict]:
         """Get open paper trades."""
         db = get_db()
-        if not db:
+        if db is None:
             return []
 
         try:
@@ -291,7 +291,7 @@ class PaperTradingEngine:
     ) -> List[Dict]:
         """Get trade history."""
         db = get_db()
-        if not db:
+        if db is None:
             return []
 
         try:
@@ -325,7 +325,7 @@ class PaperTradingEngine:
             Performance metrics
         """
         db = get_db()
-        if not db:
+        if db is None:
             return {}
 
         start_date = datetime.utcnow() - timedelta(days=days)
@@ -364,7 +364,7 @@ class PaperTradingEngine:
     async def reset_portfolio(self, user_id: str) -> bool:
         """Reset paper portfolio to initial capital."""
         db = get_db()
-        if not db:
+        if db is None:
             return False
 
         portfolio = await self.get_portfolio(user_id)

@@ -300,7 +300,7 @@ class AsyncStrategyEngine:
         """Load active strategies from database."""
         from app.database.connection import get_db
         db = get_db()
-        if not db:
+        if db is None:
             logger.error("Database not available")
             return
 

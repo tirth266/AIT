@@ -46,7 +46,7 @@ def list_strategies():
         query['symbol'] = symbol
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     strategies = list(db.strategies.find(query).skip(skip).limit(limit))
@@ -97,7 +97,7 @@ def create_strategy():
             }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     strategy = {
@@ -146,7 +146,7 @@ def get_strategy(strategy_id):
         Strategy details
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -179,7 +179,7 @@ def update_strategy(strategy_id):
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -218,7 +218,7 @@ def delete_strategy(strategy_id):
         Success message
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -251,7 +251,7 @@ def clone_strategy(strategy_id):
         New strategy ID
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -298,7 +298,7 @@ def toggle_strategy(strategy_id):
         Updated status
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:

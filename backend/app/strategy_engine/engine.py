@@ -179,7 +179,7 @@ class StrategyEngine:
     async def _load_active_strategies(self) -> None:
         """Load active strategies from database."""
         db = get_db()
-        if not db:
+        if db is None:
             logger.error("Database not available")
             return
 

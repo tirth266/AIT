@@ -30,7 +30,7 @@ def get_dashboard():
         logger.info(f"[Dashboard] Mode: {mode}")
 
         db = get_db()
-        if not db:
+        if db is None:
             logger.error("[Dashboard] Database connection missing")
             return jsonify({
                 'success': False,
@@ -155,7 +155,7 @@ def get_performance():
         start_date = None
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     query = {'mode': mode, 'status': 'CLOSED'}
@@ -214,7 +214,7 @@ def get_equity_curve():
     start_date = datetime.utcnow() - timedelta(days=days)
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     initial_balance = 10000.0
@@ -258,7 +258,7 @@ def get_recent_trades():
     mode = request.args.get('mode', 'paper')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     trades = list(db.trades.find({'mode': mode}).sort('created_at', -1).limit(limit))
@@ -282,7 +282,7 @@ def get_positions():
     mode = request.args.get('mode', 'paper')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     positions = list(db.positions.find({'status': 'open', 'mode': mode}))

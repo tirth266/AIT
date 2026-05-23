@@ -38,7 +38,7 @@ def start_bot():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -99,7 +99,7 @@ def stop_bot():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -142,7 +142,7 @@ def get_bot_status():
         List of bot statuses
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     active_strategies = list(db.strategies.find({'is_active': True}))
@@ -199,7 +199,7 @@ def switch_mode():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     db.settings.update_one(
@@ -233,7 +233,7 @@ def pause_all_bots():
     reason = data.get('reason', 'manual')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     result = db.strategies.update_many(
@@ -270,7 +270,7 @@ def resume_bots():
     strategy_ids = data.get('strategy_ids')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     query = {'pause_reason': {'$exists': True}}

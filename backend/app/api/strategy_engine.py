@@ -88,7 +88,7 @@ def get_signals():
         limit = int(request.args.get('limit', 50))
 
         db = get_db()
-        if not db:
+        if db is None:
             return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
         signals = list(db.strategy_signals.find(
@@ -118,7 +118,7 @@ def generate_signal():
             return jsonify({'error': 'validation_error', 'message': 'strategy_id is required'}), 400
 
         db = get_db()
-        if not db:
+        if db is None:
             return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
         strategy = db.strategies.find_one({'_id': ObjectId(strategy_id)})
@@ -170,7 +170,7 @@ def run_backtest():
             }), 400
 
         db = get_db()
-        if not db:
+        if db is None:
             return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
         strategy = db.strategies.find_one({'_id': ObjectId(strategy_id)})

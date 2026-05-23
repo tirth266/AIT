@@ -128,7 +128,7 @@ class RiskManager:
     async def _get_daily_loss(self, user_id: str) -> float:
         """Get current daily P&L."""
         db = get_db()
-        if not db:
+        if db is None:
             return 0.0
 
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -161,7 +161,7 @@ class RiskManager:
     async def _get_open_positions_count(self, user_id: str) -> int:
         """Get count of open positions."""
         db = get_db()
-        if not db:
+        if db is None:
             return 0
 
         try:
@@ -175,7 +175,7 @@ class RiskManager:
     async def _get_trades_today(self, user_id: str) -> int:
         """Get number of trades executed today."""
         db = get_db()
-        if not db:
+        if db is None:
             return 0
 
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -305,7 +305,7 @@ class RiskManager:
     ) -> None:
         """Log risk management events."""
         db = get_db()
-        if not db:
+        if db is None:
             return
 
         try:
@@ -324,7 +324,7 @@ class RiskManager:
     async def get_risk_summary(self, user_id: str) -> Dict:
         """Get risk management summary for user."""
         db = get_db()
-        if not db:
+        if db is None:
             return {}
 
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)

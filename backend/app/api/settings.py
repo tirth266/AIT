@@ -24,7 +24,7 @@ def get_settings():
         List of settings
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     settings = list(db.settings.find({}, {'value_encrypted': 0}))
@@ -46,7 +46,7 @@ def get_setting(key):
         Setting value
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     setting = db.settings.find_one({'key': key})
@@ -91,7 +91,7 @@ def update_settings():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     from datetime import datetime
@@ -146,7 +146,7 @@ def update_setting(key):
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     encrypted_value = None
@@ -191,7 +191,7 @@ def reset_paper_balance():
     balance = data.get('balance', 10000)
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     db.settings.update_one(
@@ -231,7 +231,7 @@ def get_risk_settings():
     }
 
     db = get_db()
-    if db:
+    if db is not None:
         settings = list(db.settings.find({'key': {'$regex': '^risk_'}}))
         for s in settings:
             key = s['key'].replace('risk_', '')
@@ -262,7 +262,7 @@ def update_risk_settings():
     data = request.get_json() or {}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     from datetime import datetime

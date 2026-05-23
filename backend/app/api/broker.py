@@ -60,7 +60,7 @@ def connect_broker():
         }), 502
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     encrypted_key = encrypt_value(api_key)
@@ -102,7 +102,7 @@ def get_broker_status():
         List of configured brokers
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     brokers = list(db.brokers.find({}, {
@@ -139,7 +139,7 @@ def disconnect_broker():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     db.brokers.update_one(
@@ -176,7 +176,7 @@ def get_balance():
 
     if mode == 'paper':
         db = get_db()
-        if db:
+        if db is not None:
             setting = db.settings.find_one({'key': 'paper_balance'})
             balance = float(setting['value']) if setting else 10000.0
 

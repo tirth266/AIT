@@ -47,7 +47,7 @@ def list_notifications():
         query['priority'] = priority.lower()
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     notifications = list(db.notifications.find(query).sort('created_at', -1).skip(skip).limit(limit))
@@ -98,7 +98,7 @@ def create_notification():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     notification = {
@@ -135,7 +135,7 @@ def get_notification(notification_id):
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -175,7 +175,7 @@ def mark_as_read(notification_id):
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -214,7 +214,7 @@ def mark_all_as_read():
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     result = db.notifications.update_many(
@@ -244,7 +244,7 @@ def delete_notification(notification_id):
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -289,7 +289,7 @@ def clear_notifications():
     clear_type = data.get('clear_type', 'read')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     query = {'user_id': user_id}
@@ -317,7 +317,7 @@ def get_unread_count():
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     count = db.notifications.count_documents({
@@ -356,7 +356,7 @@ def broadcast_notification():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     users = list(db.users.find({}, {'_id': 1}))

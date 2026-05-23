@@ -45,7 +45,7 @@ def run_backtest():
             }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     strategy_id = data['strategy_id']
@@ -110,7 +110,7 @@ def get_backtest_status(backtest_id):
         Backtest status
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -153,7 +153,7 @@ def get_backtest_results(backtest_id):
         Detailed backtest results
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:
@@ -228,7 +228,7 @@ def list_backtests():
     status = request.args.get('status')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     query = {}
@@ -264,7 +264,7 @@ def delete_backtest(backtest_id):
         Success message
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error'}), 500
 
     try:

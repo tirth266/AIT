@@ -66,7 +66,7 @@ def list_signals():
         query['generated_at'] = {'$gte': start_date}
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     signals = list(db.ai_signals.find(query).sort('generated_at', -1).skip(skip).limit(limit))
@@ -123,7 +123,7 @@ def create_signal():
             }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     now = datetime.utcnow()
@@ -169,7 +169,7 @@ def get_signal(signal_id):
         Signal details
     """
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -218,7 +218,7 @@ def execute_signal(signal_id):
     user_id = "default_user"
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     try:
@@ -328,7 +328,7 @@ def get_signal_stats():
     symbol = request.args.get('symbol')
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     query = {'is_executed': True}
@@ -404,7 +404,7 @@ def generate_batch_signals():
         }), 400
 
     db = get_db()
-    if not db:
+    if db is None:
         return jsonify({'error': 'database_error', 'message': 'Database not available'}), 500
 
     generated_signals = []

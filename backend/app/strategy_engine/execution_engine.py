@@ -81,7 +81,7 @@ class ExecutionEngine:
         """
         try:
             db = get_db()
-            if not db:
+            if db is None:
                 logger.error("Database not available for paper trade")
                 return None
 
@@ -148,7 +148,7 @@ class ExecutionEngine:
         """
         try:
             db = get_db()
-            if not db:
+            if db is None:
                 logger.error("Database not available for live trade")
                 return None
 
@@ -211,7 +211,7 @@ class ExecutionEngine:
     async def _update_paper_portfolio(self, user_id: str, trade: Dict) -> None:
         """Update paper trading portfolio."""
         db = get_db()
-        if not db:
+        if db is None:
             return
 
         portfolio = db.paper_portfolios.find_one({'user_id': user_id})
@@ -265,7 +265,7 @@ class ExecutionEngine:
         """Close a paper trading position."""
         try:
             db = get_db()
-            if not db:
+            if db is None:
                 return None
 
             portfolio = db.paper_portfolios.find_one({'user_id': user_id})
@@ -344,7 +344,7 @@ class ExecutionEngine:
         max_positions = risk_settings.get('max_positions', 5)
         db = get_db()
 
-        if db:
+        if db is not None:
             open_positions = db.paper_positions.count_documents({
                 'user_id': user_id,
                 'status': 'open'
