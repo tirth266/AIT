@@ -29,13 +29,11 @@ def generate_token(user_id: str = 'default_user') -> str:
     return jwt.encode(payload, jwt_secret, algorithm=jwt_algorithm)
 
 
-@bp.route('/token', methods=['GET', 'OPTIONS'])
+@bp.route('/token', methods=['GET'])
 def get_token():
     """
     Get authentication token for WebSocket connection.
     """
-    if request.method == 'OPTIONS':
-        return '', 204
     try:
         token = generate_token('default_user')
 
@@ -55,11 +53,9 @@ def get_token():
         }), 500
 
 
-@bp.route('/verify', methods=['POST', 'OPTIONS'])
+@bp.route('/verify', methods=['POST'])
 def verify_token():
     """Verify a JWT token."""
-    if request.method == 'OPTIONS':
-        return '', 204
     data = request.get_json() or {}
     token = data.get('token')
 
@@ -90,11 +86,9 @@ def verify_token():
         }), 401
 
 
-@bp.route('/refresh', methods=['POST', 'OPTIONS'])
+@bp.route('/refresh', methods=['POST'])
 def refresh_token():
     """Refresh an existing token."""
-    if request.method == 'OPTIONS':
-        return '', 204
     data = request.get_json() or {}
     old_token = data.get('token')
 

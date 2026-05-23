@@ -36,15 +36,12 @@ def get_api_client():
         logger.error(traceback.format_exc())
         return None
 
-@bp.route('/login', methods=['GET', 'POST', 'OPTIONS'])
+@bp.route('/login', methods=['GET', 'POST'])
 def login():
     """
     Login to Angel One using SmartAPI.
     Uses provided clientcode, password and totp (secret) to generate a session.
     """
-    if request.method == 'OPTIONS':
-        return '', 204
-
     import traceback
     import os
     import pyotp
@@ -218,7 +215,7 @@ def disconnect():
     success = session_manager.disconnect()
     return jsonify({'success': success, 'message': 'Disconnected' if success else 'Failed'})
 
-@bp.route('/profile', methods=['GET', 'OPTIONS'])
+@bp.route('/profile', methods=['GET'])
 def get_profile():
     try:
         client = get_api_client()
@@ -231,7 +228,7 @@ def get_profile():
         logger.error(f"Error fetching profile: {e}")
         return jsonify({'success': False, 'message': 'Failed to fetch profile', 'data': {}}), 500
 
-@bp.route('/funds', methods=['GET', 'OPTIONS'])
+@bp.route('/funds', methods=['GET'])
 def get_funds():
     try:
         client = get_api_client()
@@ -244,7 +241,7 @@ def get_funds():
         logger.error(f"Error fetching funds: {e}")
         return jsonify({'success': False, 'message': 'Failed to fetch funds', 'data': {}}), 500
 
-@bp.route('/positions', methods=['GET', 'OPTIONS'])
+@bp.route('/positions', methods=['GET'])
 def get_positions():
     try:
         client = get_api_client()
@@ -257,7 +254,7 @@ def get_positions():
         logger.error(f"Error fetching positions: {e}")
         return jsonify({'success': False, 'message': 'Failed to fetch positions', 'data': []}), 500
 
-@bp.route('/orders', methods=['GET', 'OPTIONS'])
+@bp.route('/orders', methods=['GET'])
 def get_orders():
     try:
         client = get_api_client()
@@ -270,7 +267,7 @@ def get_orders():
         logger.error(f"Error fetching orders: {e}")
         return jsonify({'success': False, 'message': 'Failed to fetch orders', 'data': []}), 500
 
-@bp.route('/holdings', methods=['GET', 'OPTIONS'])
+@bp.route('/holdings', methods=['GET'])
 def get_holdings():
     try:
         client = get_api_client()
@@ -283,7 +280,7 @@ def get_holdings():
         logger.error(f"Error fetching holdings: {e}")
         return jsonify({'success': False, 'message': 'Failed to fetch holdings', 'data': []}), 500
 
-@bp.route('/order/place', methods=['POST', 'OPTIONS'])
+@bp.route('/order/place', methods=['POST'])
 def place_order():
     try:
         client = get_api_client()
@@ -305,7 +302,7 @@ def place_order():
         logger.error(f"Error placing order: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/order/modify', methods=['POST', 'OPTIONS'])
+@bp.route('/order/modify', methods=['POST'])
 def modify_order():
     try:
         client = get_api_client()
@@ -322,7 +319,7 @@ def modify_order():
         logger.error(f"Error modifying order: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/order/cancel', methods=['POST', 'OPTIONS'])
+@bp.route('/order/cancel', methods=['POST'])
 def cancel_order():
     try:
         client = get_api_client()
@@ -339,7 +336,7 @@ def cancel_order():
         logger.error(f"Error cancelling order: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/ltp', methods=['GET', 'OPTIONS'])
+@bp.route('/ltp', methods=['GET'])
 def get_ltp():
     try:
         client = get_api_client()
@@ -359,7 +356,7 @@ def get_ltp():
         logger.error(f"Error fetching LTP: {e}")
         return jsonify({'success': False, 'message': str(e)}), 500
 
-@bp.route('/history', methods=['GET', 'OPTIONS'])
+@bp.route('/history', methods=['GET'])
 def get_history():
     try:
         client = get_api_client()

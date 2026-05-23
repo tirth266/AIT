@@ -15,7 +15,7 @@ logger = logging.getLogger('trading_app')
 bp = Blueprint('dashboard', __name__)
 
 
-@bp.route('', methods=['GET', 'OPTIONS'])
+@bp.route('', methods=['GET'])
 def get_dashboard():
     """
     Get dashboard data.

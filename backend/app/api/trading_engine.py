@@ -211,7 +211,7 @@ def list_positions():
     }), 200
 
 
-@bp.route('/positions/open', methods=['GET', 'OPTIONS'])
+@bp.route('/positions/open', methods=['GET'])
 def get_open_positions():
     """Get open positions."""
     try:
