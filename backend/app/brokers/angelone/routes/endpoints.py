@@ -76,13 +76,15 @@ def login():
         # Support both camelCase and snake_case
         clientcode = data.get("clientcode") or data.get("client_code")
         password = data.get("password")
-        totp_secret = data.get("totp") or data.get("totp_secret")
+        
+        # TOTP Secret should be server-side for security. 
+        # We check both TOTP_SECRET and ANGELONE_TOTP_SECRET for compatibility.
+        totp_secret = os.getenv("TOTP_SECRET") or os.getenv("ANGELONE_TOTP_SECRET") or os.getenv("ANGEL_TOTP_SECRET")
 
         # Detailed validation logging
         missing_fields = []
         if not clientcode: missing_fields.append("clientcode")
         if not password: missing_fields.append("password")
-        if not totp_secret: missing_fields.append("totp")
 
         if missing_fields:
             logger.warning(f"Validation Error: Missing fields: {missing_fields}")
@@ -92,20 +94,30 @@ def login():
                 "message": f"Missing required fields: {', '.join(missing_fields)}",
                 "missing_fields": missing_fields
             }), 400
+            
+        if not totp_secret:
+            logger.error("Configuration Error: TOTP_SECRET environment variable is not set")
+            return jsonify({
+                "success": False,
+                "error": "CONFIG_ERROR",
+                "message": "TOTP Secret not configured on server. Please check environment variables."
+            }), 500
 
         logger.info(f"Attempting login for client: {clientcode}")
 
         # 2. Generate current 6-digit TOTP from secret
         try:
-            current_totp = pyotp.TOTP(totp_secret.replace(" ", "")).now()
+            # Clean the secret and generate TOTP
+            clean_secret = totp_secret.replace(" ", "")
+            current_totp = pyotp.TOTP(clean_secret).now()
             logger.debug(f"Generated TOTP for {clientcode}")
         except Exception as totp_err:
             logger.error(f"TOTP Generation Error: {totp_err}")
             return jsonify({
                 "success": False,
                 "error": "TOTP_GEN_FAILED",
-                "message": "Invalid TOTP secret format. Please check your broker security settings."
-            }), 400
+                "message": "Failed to generate TOTP from server-side secret. Check secret format."
+            }), 500
 
         # 3. Check Environment Configuration
         api_key = os.getenv("ANGEL_API_KEY")
