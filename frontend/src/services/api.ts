@@ -1,51 +1,6 @@
-import axios from 'axios'
+import { apiClient as api } from '../api/axios'
 
-/**
- * Service-level Axios instance with production CORS and auth handling.
- */
-const API_ROOT = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-const API_URL = `${API_ROOT.replace(/\/$/, '')}/api/v1`
-
-export const api = axios.create({
-  baseURL: API_URL,
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 30000,
-})
-
-// Request interceptor to synchronize with all available authentication tokens
-api.interceptors.request.use(
-  (config) => {
-    // Check both local storage keys for maximum compatibility during transition
-    const angelToken = localStorage.getItem('angel_jwt_token');
-    const accessToken = localStorage.getItem('access_token');
-    const token = angelToken || accessToken;
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Global response handling for consistency
-api.interceptors.response.use(
-  (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      console.warn('[API Service] Unauthorized - potential session expiry');
-    }
-    
-    if (!error.response) {
-      console.error('[API Service] Network/CORS Error - check backend logs');
-    }
-    
-    return Promise.reject(error);
-  }
-);
+export { api }
 
 export const watchlistApi = {
   list: (params?: { page?: number; limit?: number }) => api.get('/watchlists', { params }),
