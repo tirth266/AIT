@@ -32,19 +32,10 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Handle unauthorized or invalid token errors by clearing session
-    if (error.response?.status === 401 || error.response?.status === 422) {
-      console.warn(`[API] ${error.response?.status} error - clearing session and redirecting`);
-      
-      // Clear all possible auth storage
+    // Handle unauthorized errors by clearing session
+    if (error.response?.status === 401) {
+      console.warn('[API] 401 Unauthorized - clearing session');
       useAuthStore.getState().clearAuth();
-      localStorage.removeItem('angel-one-auth-storage');
-      localStorage.removeItem('access_token');
-      
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
     }
     
     // Provide cleaner error feedback
