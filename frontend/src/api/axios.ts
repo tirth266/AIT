@@ -18,17 +18,14 @@ export const apiClient = axios.create({
 });
 
 // Helper to get token directly from localStorage to avoid circular store imports
-const getStoredToken = () => {
+const getStoredToken = (): string | null => {
   try {
-    // ONLY read from the direct access_token key (Flask platform token)
     const token = localStorage.getItem('access_token');
-
-    if (token && typeof token === 'string' && token.startsWith('eyJ')) {
-      // Clean the token: remove "Bearer " if it exists (case-insensitive) and trim
+    if (token && token.startsWith('eyJ')) {
       return token.replace(/^Bearer\s+/i, '').trim();
     }
   } catch (e) {
-    console.error('[API] Failed to retrieve access_token:', e);
+    console.error('[API] Token error:', e);
   }
   return null;
 };

@@ -39,19 +39,19 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
         client_code 
       } = response.data;
 
+      // Crucial: Save the platform access token (Flask-JWT-Extended) immediately for application API calls
+      if (access_token) {
+        console.log('[AUTH] Saving platform access_token:', access_token.substring(0, 30));
+        localStorage.setItem('access_token', access_token);
+      } else {
+        console.warn('[AUTH] No access_token received from backend!');
+      }
+
       // Save broker-specific tokens using tokenUtils
       // Note: tokenUtils.setJwtToken now uses 'broker_token' key
       tokenUtils.setJwtToken(broker_token);
       tokenUtils.setRefreshToken(refresh_token);
       tokenUtils.setFeedToken(feed_token);
-
-      // Crucial: Save the platform access token (Flask-JWT-Extended) for application API calls
-      if (access_token) {
-        console.log('[AUTH] Saving platform access_token:', access_token.substring(0, 50));
-        localStorage.setItem('access_token', access_token);
-      } else {
-        console.warn('[AUTH] No access_token received from backend!');
-      }
 
       // Also save broker_token explicitly to match user requirement
       if (broker_token) {
