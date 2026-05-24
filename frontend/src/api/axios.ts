@@ -20,6 +20,11 @@ export const apiClient = axios.create({
 // Helper to get token directly from localStorage to avoid circular store imports
 const getStoredToken = () => {
   try {
+    // 1. Try direct access_token key (Flask platform token)
+    const directToken = localStorage.getItem('access_token');
+    if (directToken) return directToken;
+
+    // 2. Fallback to persisted Zustand store
     const authData = localStorage.getItem('angel-one-auth-storage');
     if (authData) {
       const parsed = JSON.parse(authData);

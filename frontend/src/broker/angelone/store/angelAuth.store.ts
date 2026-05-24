@@ -30,15 +30,20 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
       const response = await authApi.login(credentials);
       console.log('[AngelAuthStore] Login response received');
       
-      const { jwt_token, refresh_token, feed_token } = response.data.data;
+      const { jwt_token, refresh_token, feed_token, access_token } = response.data.data;
       
       tokenUtils.setJwtToken(jwt_token);
       tokenUtils.setRefreshToken(refresh_token);
       tokenUtils.setFeedToken(feed_token);
       
+      // Crucial: Save the platform access token (Flask-JWT-Extended) for application API calls
+      if (access_token) {
+        localStorage.setItem('access_token', access_token);
+      }
+      
       // Also update the general auth store for axios interceptors
       useAuthStore.getState().setAuth({
-        jwtToken: jwt_token,
+        jwtToken: access_token || jwt_token, // Prefer platform token if available
         feedToken: feed_token,
         clientCode: credentials.client_code
       });
