@@ -286,6 +286,15 @@ export function DashboardPage() {
   const data = mockDashboardData
 
   useEffect(() => {
+    // Get token to check if we are ready to fetch
+    const token = useAuthStore.getState().jwtToken || 
+                  JSON.parse(localStorage.getItem('angel-one-auth-storage') || '{}')?.state?.jwtToken;
+
+    if (!token) {
+      console.log('[Dashboard] No token available yet, skipping initialization');
+      return;
+    }
+
     console.log('[Dashboard] Mounting. Fetching data...');
     
     const initDashboard = async () => {

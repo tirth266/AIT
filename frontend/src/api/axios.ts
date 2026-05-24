@@ -21,9 +21,12 @@ export const apiClient = axios.create({
 
 // Request interceptor for JWT authentication
 apiClient.interceptors.request.use((config) => {
-  const { jwtToken } = useAuthStore.getState();
-  if (jwtToken) {
-    config.headers.Authorization = `Bearer ${jwtToken}`;
+  // Try getting token from store first, then fallback to localStorage
+  const token = useAuthStore.getState().jwtToken || 
+                JSON.parse(localStorage.getItem('angel-one-auth-storage') || '{}')?.state?.jwtToken;
+                
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
