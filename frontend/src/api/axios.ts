@@ -21,14 +21,20 @@ export const apiClient = axios.create({
 const getStoredToken = () => {
   try {
     // 1. Try direct access_token key (Flask platform token)
-    const directToken = localStorage.getItem('access_token');
-    if (directToken) return directToken;
+    let token = localStorage.getItem('access_token');
 
     // 2. Fallback to persisted Zustand store
-    const authData = localStorage.getItem('angel-one-auth-storage');
-    if (authData) {
-      const parsed = JSON.parse(authData);
-      return parsed?.state?.jwtToken || parsed?.state?.accessToken || parsed?.state?.token;
+    if (!token) {
+      const authData = localStorage.getItem('angel-one-auth-storage');
+      if (authData) {
+        const parsed = JSON.parse(authData);
+        token = parsed?.state?.jwtToken || parsed?.state?.accessToken || parsed?.state?.token;
+      }
+    }
+
+    if (token && typeof token === 'string') {
+      // Clean the token: remove "Bearer " if it exists (case-insensitive) and trim
+      return token.replace(/^Bearer\s+/i, '').trim();
     }
   } catch (e) {
     console.error('[API] Failed to parse auth storage:', e);
@@ -41,9 +47,11 @@ apiClient.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token) {
     const authHeader = `Bearer ${token}`;
-    // Log first 60 chars of the header for debugging while protecting most of the token
-    console.log(`[AXIOS] Setting Authorization header: ${authHeader.substring(0, 60)}...`);
+    console.log('[AXIOS] Token first 50 chars:', token.substring(0, 50));
+    console.log('[AXIOS] Auth header:', authHeader.substring(0, 60));
     config.headers.Authorization = authHeader;
+  } else {
+    console.warn('[AXIOS] NO TOKEN - request will likely fail with 401/422');
   }
   return config;
 });

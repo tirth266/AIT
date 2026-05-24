@@ -45,7 +45,10 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
       
       // Crucial: Save the platform access token (Flask-JWT-Extended) for application API calls
       if (jwtToken) {
+        console.log('[AUTH] Saving access_token:', jwtToken.substring(0, 50));
         localStorage.setItem('access_token', jwtToken);
+      } else {
+        console.warn('[AUTH] No access_token received from backend!');
       }
       
       // Also update the general auth store for axios interceptors
