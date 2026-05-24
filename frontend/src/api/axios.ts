@@ -20,24 +20,15 @@ export const apiClient = axios.create({
 // Helper to get token directly from localStorage to avoid circular store imports
 const getStoredToken = () => {
   try {
-    // 1. Try direct access_token key (Flask platform token)
-    let token = localStorage.getItem('access_token');
+    // ONLY read from the direct access_token key (Flask platform token)
+    const token = localStorage.getItem('access_token');
 
-    // 2. Fallback to persisted Zustand store
-    if (!token) {
-      const authData = localStorage.getItem('angel-one-auth-storage');
-      if (authData) {
-        const parsed = JSON.parse(authData);
-        token = parsed?.state?.jwtToken || parsed?.state?.accessToken || parsed?.state?.token;
-      }
-    }
-
-    if (token && typeof token === 'string') {
+    if (token && typeof token === 'string' && token.startsWith('eyJ')) {
       // Clean the token: remove "Bearer " if it exists (case-insensitive) and trim
       return token.replace(/^Bearer\s+/i, '').trim();
     }
   } catch (e) {
-    console.error('[API] Failed to parse auth storage:', e);
+    console.error('[API] Failed to retrieve access_token:', e);
   }
   return null;
 };

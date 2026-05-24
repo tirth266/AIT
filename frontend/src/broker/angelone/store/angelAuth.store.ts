@@ -60,7 +60,7 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
 
       // Update the general auth store for global axios interceptors
       useAuthStore.getState().setAuth({
-        jwtToken: access_token || broker_token, // Prefer platform token
+        jwtToken: access_token, // Strictly use platform token (HS256)
         feedToken: feed_token,
         clientCode: client_code || credentials.client_code
       });
