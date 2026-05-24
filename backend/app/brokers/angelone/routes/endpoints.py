@@ -175,7 +175,11 @@ def login():
             logger.info(f"Login successful for client: {clientcode}")
 
             # Generate platform token for our API protection
-            platform_token = create_access_token(identity=clientcode)
+            from datetime import timedelta
+            platform_token = create_access_token(
+                identity=clientcode,
+                expires_delta=timedelta(hours=24)
+            )
 
             return jsonify({
                 'success': True,
