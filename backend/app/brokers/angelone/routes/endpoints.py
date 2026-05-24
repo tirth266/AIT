@@ -184,12 +184,17 @@ def login():
             return jsonify({
                 'success': True,
                 'message': 'Logged in successfully',
+                'access_token': platform_token,   # Platform token for /api/v1/*
+                'broker_token': jwt_token,       # Angel One token for broker calls
+                'refresh_token': refresh_token,
+                'feed_token': feed_token,
+                'client_code': clientcode,
                 'data': {
                     'client_code': clientcode,
-                    'jwt_token': jwt_token,  # Broker token
+                    'jwt_token': jwt_token,       # Legacy support
                     'refresh_token': refresh_token,
                     'feed_token': feed_token,
-                    'access_token': platform_token  # Platform token (Frontend should use this)
+                    'access_token': platform_token # Legacy support
                 }
             }), 200
 

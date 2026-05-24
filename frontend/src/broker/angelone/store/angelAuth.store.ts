@@ -30,21 +30,28 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
       const response = await authApi.login(credentials);
       console.log('[AngelAuthStore] Login response received');
       
-      const { jwt_token, refresh_token, feed_token, access_token } = response.data.data;
+      // The backend returns access_token (platform) and broker_token (Angel One)
+      const { broker_token, refresh_token, feed_token, access_token } = response.data;
       
-      tokenUtils.setJwtToken(jwt_token);
-      tokenUtils.setRefreshToken(refresh_token);
-      tokenUtils.setFeedToken(feed_token);
+      // If the backend nested them under 'data' (legacy support)
+      const jwtToken = access_token || response.data.data?.access_token;
+      const angelToken = broker_token || response.data.data?.jwt_token;
+      const refreshToken = refresh_token || response.data.data?.refresh_token;
+      const feedToken = feed_token || response.data.data?.feed_token;
+
+      tokenUtils.setJwtToken(angelToken);
+      tokenUtils.setRefreshToken(refreshToken);
+      tokenUtils.setFeedToken(feedToken);
       
       // Crucial: Save the platform access token (Flask-JWT-Extended) for application API calls
-      if (access_token) {
-        localStorage.setItem('access_token', access_token);
+      if (jwtToken) {
+        localStorage.setItem('access_token', jwtToken);
       }
       
       // Also update the general auth store for axios interceptors
       useAuthStore.getState().setAuth({
-        jwtToken: access_token || jwt_token, // Prefer platform token if available
-        feedToken: feed_token,
+        jwtToken: jwtToken || angelToken, // Prefer platform token if available
+        feedToken: feedToken,
         clientCode: credentials.client_code
       });
       
