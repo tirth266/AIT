@@ -1,6 +1,4 @@
 import axios from 'axios';
-import { useAuthStore } from '../store/auth.store';
-
 /**
  * Production-safe Axios instance for REST API communication.
  * Configured with proper CORS credentials and base URL.
@@ -19,12 +17,23 @@ export const apiClient = axios.create({
   },
 });
 
+// Helper to get token directly from localStorage to avoid circular store imports
+const getStoredToken = () => {
+  try {
+    const authData = localStorage.getItem('angel-one-auth-storage');
+    if (authData) {
+      const parsed = JSON.parse(authData);
+      return parsed?.state?.jwtToken || parsed?.state?.accessToken || parsed?.state?.token;
+    }
+  } catch (e) {
+    console.error('[API] Failed to parse auth storage:', e);
+  }
+  return null;
+};
+
 // Request interceptor for JWT authentication
 apiClient.interceptors.request.use((config) => {
-  // Try getting token from store first, then fallback to localStorage
-  const token = useAuthStore.getState().jwtToken || 
-                JSON.parse(localStorage.getItem('angel-one-auth-storage') || '{}')?.state?.jwtToken;
-                
+  const token = getStoredToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -39,8 +48,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 || error.response?.status === 422) {
       console.warn(`[API] ${error.response?.status} error - clearing session and redirecting`);
       
-      // Clear all possible auth storage
-      useAuthStore.getState().clearAuth();
+      // Clear storage directly to avoid dependency on store
       localStorage.removeItem('angel-one-auth-storage');
       localStorage.removeItem('access_token');
       
