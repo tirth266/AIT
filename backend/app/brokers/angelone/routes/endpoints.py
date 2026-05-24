@@ -177,25 +177,18 @@ def login():
             # Generate platform token for our API protection
             from datetime import timedelta
             platform_token = create_access_token(
-                identity=clientcode,
+                identity=str(clientcode),
                 expires_delta=timedelta(hours=24)
             )
 
             return jsonify({
                 'success': True,
                 'message': 'Logged in successfully',
-                'access_token': platform_token,   # Platform token for /api/v1/*
-                'broker_token': jwt_token,       # Angel One token for broker calls
+                'access_token': platform_token,   # Flask JWT (HS256) for /api/v1/*
+                'broker_token': jwt_token,       # Angel One JWT (HS512) for broker calls
                 'refresh_token': refresh_token,
                 'feed_token': feed_token,
-                'client_code': clientcode,
-                'data': {
-                    'client_code': clientcode,
-                    'jwt_token': jwt_token,       # Legacy support
-                    'refresh_token': refresh_token,
-                    'feed_token': feed_token,
-                    'access_token': platform_token # Legacy support
-                }
+                'client_code': clientcode
             }), 200
 
         except Exception as api_err:

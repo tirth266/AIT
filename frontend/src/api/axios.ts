@@ -61,15 +61,19 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     // Handle unauthorized or invalid token errors by clearing session
-    if (error.response?.status === 401 || error.response?.status === 422) {
-      console.warn(`[API] ${error.response?.status} error - clearing session and redirecting`);
-      
-      // Clear storage directly to avoid dependency on store
-      localStorage.removeItem('angel-one-auth-storage');
-      localStorage.removeItem('access_token');
-      
-      // Redirect to login if not already there
-      if (window.location.pathname !== '/login') {
+    if (error.response?.status === 422 || error.response?.status === 401) {
+      const errorData = error.response?.data;
+      const isAuthError = errorData?.error === 'invalid_token' 
+                       || errorData?.error === 'unauthorized'
+                       || errorData?.type === 'Unauthorized'
+                       || error.response?.status === 401;
+
+      // Only clear session for true auth failures, not all 422s
+      if (isAuthError && window.location.pathname !== '/login') {
+        console.warn(`[API] Auth error (${error.response?.status}) - clearing session and redirecting`);
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('broker_token');
+        localStorage.removeItem('angel-one-auth-storage');
         window.location.href = '/login';
       }
     }

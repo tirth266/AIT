@@ -29,35 +29,42 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
     try {
       const response = await authApi.login(credentials);
       console.log('[AngelAuthStore] Login response received');
-      
-      // The backend returns access_token (platform) and broker_token (Angel One)
-      const { broker_token, refresh_token, feed_token, access_token } = response.data;
-      
-      // If the backend nested them under 'data' (legacy support)
-      const jwtToken = access_token || response.data.data?.access_token;
-      const angelToken = broker_token || response.data.data?.jwt_token;
-      const refreshToken = refresh_token || response.data.data?.refresh_token;
-      const feedToken = feed_token || response.data.data?.feed_token;
 
-      tokenUtils.setJwtToken(angelToken);
-      tokenUtils.setRefreshToken(refreshToken);
-      tokenUtils.setFeedToken(feedToken);
-      
+      // The backend returns access_token (platform) and broker_token (Angel One) at the top level
+      const { 
+        broker_token, 
+        refresh_token, 
+        feed_token, 
+        access_token,
+        client_code 
+      } = response.data;
+
+      // Save broker-specific tokens using tokenUtils
+      // Note: tokenUtils.setJwtToken now uses 'broker_token' key
+      tokenUtils.setJwtToken(broker_token);
+      tokenUtils.setRefreshToken(refresh_token);
+      tokenUtils.setFeedToken(feed_token);
+
       // Crucial: Save the platform access token (Flask-JWT-Extended) for application API calls
-      if (jwtToken) {
-        console.log('[AUTH] Saving access_token:', jwtToken.substring(0, 50));
-        localStorage.setItem('access_token', jwtToken);
+      if (access_token) {
+        console.log('[AUTH] Saving platform access_token:', access_token.substring(0, 50));
+        localStorage.setItem('access_token', access_token);
       } else {
         console.warn('[AUTH] No access_token received from backend!');
       }
-      
-      // Also update the general auth store for axios interceptors
+
+      // Also save broker_token explicitly to match user requirement
+      if (broker_token) {
+        localStorage.setItem('broker_token', broker_token);
+      }
+
+      // Update the general auth store for global axios interceptors
       useAuthStore.getState().setAuth({
-        jwtToken: jwtToken || angelToken, // Prefer platform token if available
-        feedToken: feedToken,
-        clientCode: credentials.client_code
+        jwtToken: access_token || broker_token, // Prefer platform token
+        feedToken: feed_token,
+        clientCode: client_code || credentials.client_code
       });
-      
+
       set({ isAuthenticated: true, isLoading: false });
       console.log('[AngelAuthStore] Login successful and stores updated');
     } catch (error: any) {

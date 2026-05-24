@@ -1,4 +1,4 @@
-const ANGEL_JWT_KEY = 'angel_jwt_token';
+const ANGEL_JWT_KEY = 'broker_token';
 const ANGEL_REFRESH_KEY = 'angel_refresh_token';
 const ANGEL_FEED_KEY = 'angel_feed_token';
 

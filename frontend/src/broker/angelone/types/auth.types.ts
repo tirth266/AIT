@@ -24,8 +24,12 @@ export interface AngelUserProfile {
 }
 
 export interface AngelLoginResponse {
-  status: boolean;
+  success: boolean;
   message: string;
-  error_code: string;
-  data: AngelSession;
+  access_token: string;
+  broker_token: string;
+  refresh_token: string;
+  feed_token: string;
+  client_code: string;
+  data?: AngelSession & { access_token?: string };
 }
