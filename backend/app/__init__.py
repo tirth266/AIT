@@ -22,6 +22,7 @@ START_TIME = __import__('datetime').datetime.utcnow()
 
 # Initialize SocketIO globally with production CORS settings
 # Increased ping_timeout and ping_interval to prevent WebSocket heartbeats timeouts
+from flask_socketio import SocketIO, emit
 socketio = SocketIO(
     cors_allowed_origins=[
         "https://ait-flame.vercel.app",
@@ -30,8 +31,8 @@ socketio = SocketIO(
     async_mode="eventlet",
     logger=True,
     engineio_logger=True,
-    ping_timeout=120,
-    ping_interval=45
+    ping_timeout=180,
+    ping_interval=60
 )
 
 def check_environment():
@@ -156,6 +157,20 @@ def create_app(config_name: str = None) -> Flask:
     # SocketIO will be initialized with the app
     socketio.init_app(app)
 
+    @socketio.on('ping')
+    def handle_ping():
+        """Handle ping from client and return heartbeat with timestamp."""
+        import datetime
+        emit('heartbeat', {
+            'status': 'ok', 
+            'timestamp': datetime.datetime.utcnow().isoformat()
+        })
+
+    @socketio.on('heartbeat')
+    def handle_heartbeat(data):
+        """Handle heartbeat from client and return heartbeat_ack."""
+        emit('heartbeat_ack', {'status': 'ok'})
+
     # JWT Error Handlers
     @jwt.invalid_token_loader
     def invalid_token_callback(error):
@@ -278,8 +293,9 @@ def register_blueprints(app: Flask) -> None:
 
     def reg_trading_engine():
         from .api import trading_engine
-        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/positions')
-        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading')
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/positions', name='positions_bp')
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading', name='trading_bp')
+        app.register_blueprint(trading_engine.bp, url_prefix='/api/v1/trading/positions', name='trading_positions_bp')
 
     def reg_settings():
         from .api import settings
