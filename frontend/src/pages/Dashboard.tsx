@@ -42,6 +42,7 @@ import {
   useRealtimeAISignals 
 } from '../hooks'
 import { useAngelOne } from '../broker/angelone'
+import { useAuthStore } from '../store/auth.store'
 
 const chartColors = {
   primary: '#238636',
