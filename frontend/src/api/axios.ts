@@ -40,7 +40,10 @@ const getStoredToken = () => {
 apiClient.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+    const authHeader = `Bearer ${token}`;
+    // Log first 60 chars of the header for debugging while protecting most of the token
+    console.log(`[AXIOS] Setting Authorization header: ${authHeader.substring(0, 60)}...`);
+    config.headers.Authorization = authHeader;
   }
   return config;
 });
