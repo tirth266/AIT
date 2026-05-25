@@ -20,10 +20,11 @@ export const apiClient = axios.create({
 // Helper to get token directly from localStorage to avoid circular store imports
 const getStoredToken = (): string | null => {
   try {
-    const raw = localStorage.getItem('access_token');
-    console.log('[AXIOS] Raw access_token:', raw ? `${raw.substring(0, 40)}...` : 'NULL');
+    // Read from dedicated platform JWT key (not access_token which Zustand might overwrite)
+    const raw = localStorage.getItem('platform_jwt');
+    console.log('[AXIOS] Raw platform_jwt:', raw ? `${raw.substring(0, 40)}...` : 'NULL');
     if (!raw) {
-      console.warn('[AXIOS] NO TOKEN in localStorage');
+      console.warn('[AXIOS] NO TOKEN in platform_jwt');
       return null;
     }
 

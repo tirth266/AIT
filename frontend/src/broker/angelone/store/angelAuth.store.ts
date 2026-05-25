@@ -43,8 +43,8 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
       if (access_token) {
         // Ensure we save clean token without Bearer prefix
         const cleanToken = access_token.replace(/^Bearer\s+/i, '').trim();
-        console.log('[AUTH] Saved clean Flask JWT:', cleanToken.substring(0, 30));
-        localStorage.setItem('access_token', cleanToken);
+        console.log('[AUTH] Saved clean Platform JWT:', cleanToken.substring(0, 30));
+        localStorage.setItem('platform_jwt', cleanToken);
       } else {
         console.warn('[AUTH] No access_token received from backend!');
       }

@@ -307,12 +307,12 @@ export function DashboardPage() {
     };
 
     // Check for token in localStorage (source of truth for axios)
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('platform_jwt');
 
     if (!token) {
-      console.log('[Dashboard] Waiting for token in localStorage...');
+      console.log('[Dashboard] Waiting for token in localStorage (platform_jwt)...');
       const interval = setInterval(() => {
-        const t = localStorage.getItem('access_token');
+        const t = localStorage.getItem('platform_jwt');
         if (t) {
           console.log('[Dashboard] Token found, starting initialization');
           clearInterval(interval);
