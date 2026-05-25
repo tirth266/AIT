@@ -287,18 +287,8 @@ export function DashboardPage() {
   const data = mockDashboardData
 
   useEffect(() => {
-    // Get token to check if we are ready to fetch
-    const token = useAuthStore.getState().jwtToken || 
-                  JSON.parse(localStorage.getItem('angel-one-auth-storage') || '{}')?.state?.jwtToken;
-
-    if (!token) {
-      console.log('[Dashboard] No token available yet, skipping initialization');
-      return;
-    }
-
-    console.log('[Dashboard] Mounting. Fetching data...');
-    
     const initDashboard = async () => {
+      console.log('[Dashboard] Initializing data...');
       try {
         await Promise.all([
           fetchSummary(),
@@ -315,6 +305,22 @@ export function DashboardPage() {
         console.error('[Dashboard] Error during initialization:', err);
       }
     };
+
+    // Check for token in localStorage (source of truth for axios)
+    const token = localStorage.getItem('access_token');
+
+    if (!token) {
+      console.log('[Dashboard] Waiting for token in localStorage...');
+      const interval = setInterval(() => {
+        const t = localStorage.getItem('access_token');
+        if (t) {
+          console.log('[Dashboard] Token found, starting initialization');
+          clearInterval(interval);
+          initDashboard();
+        }
+      }, 100);
+      return () => clearInterval(interval);
+    }
 
     initDashboard();
   }, [fetchSummary, fetchFunds, fetchPositions, fetchWatchlists, isAuthenticated, refreshAll])

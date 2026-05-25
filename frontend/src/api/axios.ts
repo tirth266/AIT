@@ -21,8 +21,12 @@ export const apiClient = axios.create({
 const getStoredToken = (): string | null => {
   try {
     const token = localStorage.getItem('access_token');
+    console.log('[AXIOS] Reading access_token:', token ? `${token.substring(0, 30)}...` : 'NULL');
     if (token && token.startsWith('eyJ')) {
       return token.replace(/^Bearer\s+/i, '').trim();
+    }
+    if (!token) {
+      console.warn('[AXIOS] NO TOKEN in localStorage');
     }
   } catch (e) {
     console.error('[API] Token error:', e);

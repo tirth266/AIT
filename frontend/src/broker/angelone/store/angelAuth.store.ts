@@ -41,11 +41,14 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
 
       // Crucial: Save the platform access token (Flask-JWT-Extended) immediately for application API calls
       if (access_token) {
-        console.log('[AUTH] Saving platform access_token:', access_token.substring(0, 30));
+        console.log('[AUTH] Saved Flask JWT:', access_token.substring(0, 30));
         localStorage.setItem('access_token', access_token);
       } else {
         console.warn('[AUTH] No access_token received from backend!');
       }
+
+      // Small delay to ensure localStorage is committed before dashboard fetches
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Save broker-specific tokens using tokenUtils
       // Note: tokenUtils.setJwtToken now uses 'broker_token' key
