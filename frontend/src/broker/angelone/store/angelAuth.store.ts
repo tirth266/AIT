@@ -41,8 +41,10 @@ export const useAngelAuthStore = create<AngelAuthState>((set) => ({
 
       // Crucial: Save the platform access token (Flask-JWT-Extended) immediately for application API calls
       if (access_token) {
-        console.log('[AUTH] Saved Flask JWT:', access_token.substring(0, 30));
-        localStorage.setItem('access_token', access_token);
+        // Ensure we save clean token without Bearer prefix
+        const cleanToken = access_token.replace(/^Bearer\s+/i, '').trim();
+        console.log('[AUTH] Saved clean Flask JWT:', cleanToken.substring(0, 30));
+        localStorage.setItem('access_token', cleanToken);
       } else {
         console.warn('[AUTH] No access_token received from backend!');
       }

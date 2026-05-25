@@ -20,13 +20,31 @@ export const apiClient = axios.create({
 // Helper to get token directly from localStorage to avoid circular store imports
 const getStoredToken = (): string | null => {
   try {
-    const token = localStorage.getItem('access_token');
-    console.log('[AXIOS] Reading access_token:', token ? `${token.substring(0, 30)}...` : 'NULL');
-    if (token && token.startsWith('eyJ')) {
-      return token.replace(/^Bearer\s+/i, '').trim();
-    }
-    if (!token) {
+    const raw = localStorage.getItem('access_token');
+    console.log('[AXIOS] Raw access_token:', raw ? `${raw.substring(0, 40)}...` : 'NULL');
+    if (!raw) {
       console.warn('[AXIOS] NO TOKEN in localStorage');
+      return null;
+    }
+
+    // Strip Bearer prefix if present
+    const token = raw.replace(/^Bearer\s+/i, '').trim();
+    
+    // Quick validation and algorithm check
+    if (token && token.includes('.')) {
+      const parts = token.split('.');
+      if (parts.length === 3) {
+        try {
+          const header = JSON.parse(atob(parts[0]));
+          console.log('[AXIOS] Token algorithm:', header.alg); // Should be HS256 for Flask
+          if (header.alg === 'HS512') {
+            console.warn('[AXIOS] Found HS512 token in access_token key! This is likely the broker token.');
+          }
+        } catch (e) {
+          console.error('[AXIOS] Header decode error:', e);
+        }
+      }
+      return token;
     }
   } catch (e) {
     console.error('[API] Token error:', e);
